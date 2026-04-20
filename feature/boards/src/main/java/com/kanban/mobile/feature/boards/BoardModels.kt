@@ -23,7 +23,8 @@ enum class BoardRole {
             }
     }
 
-    fun toApi(): String = name
+    /** Backend expects lowercase: `owner`, `editor`, `viewer`. */
+    fun toApi(): String = name.lowercase()
 }
 
 data class BoardMember(

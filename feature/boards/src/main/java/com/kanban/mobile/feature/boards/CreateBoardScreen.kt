@@ -1,6 +1,7 @@
 package com.kanban.mobile.feature.boards
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -111,6 +113,7 @@ fun CreateBoardScreen(
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Title") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     )
 
                     Text(text = "Team", style = MaterialTheme.typography.labelLarge)
@@ -139,6 +142,7 @@ fun CreateBoardScreen(
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Project IDs (comma-separated, optional)") },
                         minLines = 2,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))

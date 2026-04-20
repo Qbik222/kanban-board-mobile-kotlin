@@ -76,4 +76,28 @@ class KanbanBoardReducerTest {
         assertEquals(0, r.columns[0].order)
         assertEquals(1, r.columns[1].order)
     }
+
+    @Test
+    fun addComment_isIdempotentWhenCommentIdAlreadyPresent() {
+        val base = sampleBoard()
+        val existing = CardComment("n", "hello", "u1")
+        val board = base.copy(
+            columns = base.columns.map { col ->
+                if (col.id != "c1") {
+                    col
+                } else {
+                    col.copy(
+                        cards = col.cards.map { c ->
+                            if (c.id != "a") c else c.copy(comments = listOf(existing))
+                        },
+                    )
+                }
+            },
+        )
+        val again = CardComment("n", "duplicate body", "u1")
+        val next = KanbanBoardReducer.addComment(board, "a", again)
+        val card = next.columns.first { it.id == "c1" }.cards.first { it.id == "a" }
+        assertEquals(1, card.comments.size)
+        assertEquals("hello", card.comments[0].body)
+    }
 }

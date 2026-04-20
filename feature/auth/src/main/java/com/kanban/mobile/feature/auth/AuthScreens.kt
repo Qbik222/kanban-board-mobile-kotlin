@@ -16,11 +16,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -67,6 +69,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Email") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             )
             OutlinedTextField(
                 value = state.password,
@@ -74,6 +77,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Password") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             )
             state.error?.let {
                 Text(text = it, color = MaterialTheme.colorScheme.error)
@@ -121,6 +125,7 @@ fun RegisterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Name") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             )
             OutlinedTextField(
                 value = state.email,
@@ -128,6 +133,7 @@ fun RegisterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Email") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             )
             OutlinedTextField(
                 value = state.password,
@@ -135,6 +141,7 @@ fun RegisterScreen(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Password") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             )
             state.error?.let {
                 Text(text = it, color = MaterialTheme.colorScheme.error)

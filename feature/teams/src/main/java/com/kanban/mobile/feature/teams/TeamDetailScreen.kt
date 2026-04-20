@@ -1,6 +1,7 @@
 package com.kanban.mobile.feature.teams
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -129,6 +131,7 @@ fun TeamDetailScreen(
                             label = { Text("Search users (name, email, id)") },
                             singleLine = true,
                             enabled = !state.pendingMutation,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         )
                         if (state.inviteCandidates.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
@@ -191,6 +194,7 @@ fun TeamDetailScreen(
                     label = { Text("Name") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                 )
             },
             confirmButton = {

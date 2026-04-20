@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -159,7 +160,10 @@ fun TeamsListScreen(
                     label = { Text("Name") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Done,
+                    ),
                     keyboardActions = KeyboardActions(
                         onDone = {
                             if (createName.trim().isNotBlank()) {

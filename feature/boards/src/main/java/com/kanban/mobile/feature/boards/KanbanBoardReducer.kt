@@ -130,6 +130,7 @@ object KanbanBoardReducer {
                 col.copy(
                     cards = col.cards.map { c ->
                         if (c.id != cardId) c
+                        else if (c.comments.any { it.id == comment.id }) c
                         else c.copy(comments = c.comments + comment)
                     },
                 )

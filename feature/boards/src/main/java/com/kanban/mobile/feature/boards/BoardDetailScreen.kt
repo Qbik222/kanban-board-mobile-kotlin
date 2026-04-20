@@ -70,6 +70,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -80,6 +81,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kanban.mobile.feature.boards.permissions.BoardPermission
 
 private const val DESCRIPTION_PREVIEW_CHARS = 120
+
+private val TextFieldKeyboard = KeyboardOptions(keyboardType = KeyboardType.Text)
+private fun textFieldKeyboard(imeAction: ImeAction) =
+    KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = imeAction)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -337,7 +342,7 @@ private fun BoardKanbanContent(
                         onValueChange = onNewColumnTitleChange,
                         placeholder = { Text("New column") },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardOptions = textFieldKeyboard(ImeAction.Done),
                         keyboardActions = KeyboardActions(
                             onDone = {
                                 val t = newColumnTitle.trim()
@@ -452,6 +457,7 @@ private fun BoardKanbanContent(
                     onValueChange = { renameText = it },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    keyboardOptions = TextFieldKeyboard,
                 )
             },
         )
@@ -481,24 +487,20 @@ private fun InlineNewCardDraftBlock(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Title") },
                 singleLine = true,
+                keyboardOptions = TextFieldKeyboard,
             )
-            OutlinedTextField(
-                value = draft.deadlineStart,
-                onValueChange = { v ->
-                    viewModel.updateInlineNewCardDraft { it.copy(deadlineStart = v) }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Start date (ISO)") },
-                singleLine = true,
+            DeadlineDateField(
+                label = "Start date",
+                isoValue = draft.deadlineStart,
+                onIsoChange = { v -> viewModel.updateInlineNewCardDraft { it.copy(deadlineStart = v) } },
+                enabled = true,
             )
-            OutlinedTextField(
-                value = draft.deadlineEnd,
-                onValueChange = { v ->
-                    viewModel.updateInlineNewCardDraft { it.copy(deadlineEnd = v) }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("End date (ISO)") },
-                singleLine = true,
+            Spacer(modifier = Modifier.height(4.dp))
+            DeadlineDateField(
+                label = "End date",
+                isoValue = draft.deadlineEnd,
+                onIsoChange = { v -> viewModel.updateInlineNewCardDraft { it.copy(deadlineEnd = v) } },
+                enabled = true,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { viewModel.submitInlineNewCard() }) {
@@ -797,6 +799,7 @@ private fun CardDetailSheet(
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Title") },
             singleLine = true,
+            keyboardOptions = TextFieldKeyboard,
         )
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
@@ -806,6 +809,7 @@ private fun CardDetailSheet(
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Description") },
             minLines = 3,
+            keyboardOptions = TextFieldKeyboard,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text("Priority", style = MaterialTheme.typography.labelLarge)
@@ -834,6 +838,7 @@ private fun CardDetailSheet(
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Assignee user id") },
             singleLine = true,
+            keyboardOptions = TextFieldKeyboard,
         )
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
@@ -843,24 +848,21 @@ private fun CardDetailSheet(
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Project IDs (comma-separated)") },
             singleLine = true,
+            keyboardOptions = TextFieldKeyboard,
         )
         Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = draft.deadlineStart,
-            onValueChange = { onDraftChange(draft.copy(deadlineStart = it)) },
+        DeadlineDateField(
+            label = "Start date",
+            isoValue = draft.deadlineStart,
+            onIsoChange = { onDraftChange(draft.copy(deadlineStart = it)) },
             enabled = canEdit,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Start date (ISO)") },
-            singleLine = true,
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = draft.deadlineEnd,
-            onValueChange = { onDraftChange(draft.copy(deadlineEnd = it)) },
+        Spacer(modifier = Modifier.height(4.dp))
+        DeadlineDateField(
+            label = "End date",
+            isoValue = draft.deadlineEnd,
+            onIsoChange = { onDraftChange(draft.copy(deadlineEnd = it)) },
             enabled = canEdit,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("End date (ISO)") },
-            singleLine = true,
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -919,6 +921,7 @@ private fun CardDetailSheet(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("New comment") },
                 minLines = 2,
+                keyboardOptions = TextFieldKeyboard,
             )
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
