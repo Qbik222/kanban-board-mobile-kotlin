@@ -2,6 +2,7 @@
 
 package com.kanban.mobile.core.network.dto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 
@@ -27,9 +28,8 @@ data class CreateBoardRequestDto(
 
 @Serializable
 data class BoardMemberDto(
-    val userId: String,
+    @SerialName("id") val userId: String,
     val role: String,
-    val id: String? = null,
     val email: String? = null,
     val name: String? = null,
 )
@@ -65,7 +65,9 @@ data class BoardDetailsDto(
 data class ColumnDto(
     val id: String,
     val title: String,
+    val boardId: String? = null,
     val order: Int = 0,
+    val isDeleted: Boolean? = null,
     val cards: List<CardDto> = emptyList(),
 )
 
@@ -76,6 +78,8 @@ data class CardDto(
     val description: String? = null,
     val priority: String? = null,
     val columnId: String? = null,
+    val boardId: String? = null,
+    val isDeleted: Boolean? = null,
     val order: Int = 0,
     val assigneeId: String? = null,
     val projectIds: List<String> = emptyList(),
@@ -85,14 +89,17 @@ data class CardDto(
 
 @Serializable
 data class CardCommentDto(
+    @JsonNames("_id", "id")
     val id: String,
     @JsonNames("text", "body")
     val body: String? = null,
-    val userId: String? = null,
+    @SerialName("authorId") val userId: String? = null,
 )
 
 @Serializable
 data class CardDeadlineDto(
+    val startDate: String? = null,
+    val endDate: String? = null,
     val dueAt: String? = null,
 )
 

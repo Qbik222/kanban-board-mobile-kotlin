@@ -3,6 +3,7 @@ package com.kanban.mobile.core.realtime
 import com.kanban.mobile.core.network.NetworkConfig
 import com.kanban.mobile.core.session.SessionRepository
 import io.socket.client.IO
+import io.socket.client.Manager
 import io.socket.client.Socket
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
@@ -123,7 +124,7 @@ class SocketBoardRealtimeClient @Inject constructor(
                 ?: "connect_error"
             _events.tryEmit(BoardRealtimeEvent.SocketConnectError(msg))
         }
-        s.on(Socket.EVENT_RECONNECT) {
+        s.io().on(Manager.EVENT_RECONNECT) {
             scope.launch(Dispatchers.IO) {
                 joinMutex.withLock {
                     lastJoinSignature.set(null)
@@ -180,7 +181,7 @@ class SocketBoardRealtimeClient @Inject constructor(
         s.off(Socket.EVENT_CONNECT)
         s.off(Socket.EVENT_DISCONNECT)
         s.off(Socket.EVENT_CONNECT_ERROR)
-        s.off(Socket.EVENT_RECONNECT)
+        s.io().off(Manager.EVENT_RECONNECT)
         s.off("board:joined")
         s.off("board:join_error")
         s.off("board:updated")

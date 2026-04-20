@@ -41,7 +41,7 @@ interface TeamsApi {
         @Body body: AddTeamMemberRequestDto,
     )
 
-    @PATCH("teams/{teamId}/members/{userId}")
+    @PATCH("teams/{teamId}/members/{userId}/role")
     suspend fun patchMember(
         @Path("teamId") teamId: String,
         @Path("userId") userId: String,

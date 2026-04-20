@@ -4,7 +4,12 @@ enum class TeamMemberRole {
     ADMIN,
     MEMBER;
 
-    fun toApiString(): String = name
+    /** Backend uses `admin` | `user` for team member roles. */
+    fun toApiString(): String =
+        when (this) {
+            ADMIN -> "admin"
+            MEMBER -> "user"
+        }
 }
 
 data class Team(

@@ -53,5 +53,5 @@ fun CardDto.toBoardCard(columnId: String? = null): BoardCard =
         assigneeId = assigneeId,
         projectIds = projectIds,
         comments = comments.map { CardComment(id = it.id, body = it.body, userId = it.userId) },
-        deadlineDueAt = deadline?.dueAt,
+        deadlineDueAt = deadline?.endDate ?: deadline?.startDate ?: deadline?.dueAt,
     )

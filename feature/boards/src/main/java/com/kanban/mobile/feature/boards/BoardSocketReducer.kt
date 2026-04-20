@@ -8,7 +8,6 @@ import com.kanban.mobile.core.network.dto.ColumnDto
 import com.kanban.mobile.core.realtime.BoardRealtimeEvent
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -58,9 +57,9 @@ object BoardSocketReducer {
             is BoardRealtimeEvent.CommentAdded ->
                 reduceCardPayload(current, event.payloadJson, json, isCreate = false)
 
-            BoardRealtimeEvent.BoardJoined,
-            BoardRealtimeEvent.BoardJoinError,
-            BoardRealtimeEvent.SocketConnectError,
+            is BoardRealtimeEvent.BoardJoined,
+            is BoardRealtimeEvent.BoardJoinError,
+            is BoardRealtimeEvent.SocketConnectError,
             BoardRealtimeEvent.SocketConnected,
             BoardRealtimeEvent.SocketDisconnected,
             -> BoardSocketReduceResult(current)

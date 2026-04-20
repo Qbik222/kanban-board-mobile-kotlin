@@ -27,7 +27,7 @@ class DefaultAuthRepository @Inject constructor(
         sessionRepository.setUserProfile(userId = user?.id, email = user?.email)
     }
 
-    override suspend fun register(email: String, password: String, name: String?): Result<Unit> = runCatching {
+    override suspend fun register(email: String, password: String, name: String): Result<Unit> = runCatching {
         val body = RegisterRequestDto(email = email, password = password, name = name)
         val res = authApi.register(body)
         val token = res.accessTokenValue() ?: error("Missing access token")

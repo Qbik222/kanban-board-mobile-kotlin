@@ -41,9 +41,13 @@ class RegisterViewModel @Inject constructor(
     fun register(onSuccess: () -> Unit) {
         val email = _uiState.value.email.trim()
         val password = _uiState.value.password
-        val name = _uiState.value.name.trim().ifBlank { null }
+        val name = _uiState.value.name.trim()
         if (email.isBlank() || password.isBlank()) {
             _uiState.update { it.copy(error = "Enter email and password") }
+            return
+        }
+        if (name.length < 2) {
+            _uiState.update { it.copy(error = "Name must be at least 2 characters") }
             return
         }
         viewModelScope.launch {

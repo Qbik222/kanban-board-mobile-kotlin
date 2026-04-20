@@ -13,13 +13,15 @@ data class LoginRequestDto(
 data class RegisterRequestDto(
     val email: String,
     val password: String,
-    val name: String? = null,
+    val name: String,
+    val avatarUrl: String? = null,
 )
 
 @Serializable
 data class AuthResponseDto(
     @SerialName("accessToken") val accessToken: String? = null,
     @SerialName("token") val token: String? = null,
+    val csrfToken: String? = null,
     val user: UserDto? = null,
 ) {
     fun accessTokenValue(): String? = accessToken ?: token
@@ -29,6 +31,7 @@ data class AuthResponseDto(
 data class RefreshResponseDto(
     @SerialName("accessToken") val accessToken: String? = null,
     @SerialName("token") val token: String? = null,
+    val csrfToken: String? = null,
 ) {
     fun accessTokenValue(): String? = accessToken ?: token
 }
@@ -38,4 +41,7 @@ data class UserDto(
     val id: String? = null,
     val email: String? = null,
     val name: String? = null,
+    val avatarUrl: String? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
 )

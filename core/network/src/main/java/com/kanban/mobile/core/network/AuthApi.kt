@@ -22,6 +22,6 @@ interface AuthApi {
     @POST("auth/logout")
     suspend fun logout()
 
-    @GET("auth/me")
+    @GET("users/me")
     suspend fun me(): UserDto
 }

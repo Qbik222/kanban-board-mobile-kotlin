@@ -393,7 +393,7 @@ class BoardDetailViewModel @Inject constructor(
                     ),
                 )
             }
-            BoardRealtimeEvent.BoardJoined,
+            is BoardRealtimeEvent.BoardJoined,
             BoardRealtimeEvent.SocketConnected,
             BoardRealtimeEvent.SocketDisconnected,
             -> Unit

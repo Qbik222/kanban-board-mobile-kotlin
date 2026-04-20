@@ -3,7 +3,6 @@ package com.kanban.mobile.core.network
 import com.kanban.mobile.core.network.dto.BoardDetailsDto
 import com.kanban.mobile.core.network.dto.BoardMemberDto
 import com.kanban.mobile.core.network.dto.BoardSummaryDto
-import com.kanban.mobile.core.network.dto.CardCommentDto
 import com.kanban.mobile.core.network.dto.CardDto
 import com.kanban.mobile.core.network.dto.ColumnDto
 import com.kanban.mobile.core.network.dto.CreateBoardRequestDto
@@ -104,11 +103,11 @@ interface BoardApi {
     suspend fun createComment(
         @Path("cardId") cardId: String,
         @Body body: CreateCardCommentRequestDto,
-    ): CardCommentDto
+    ): CardDto
 
     @DELETE("cards/{cardId}/comments/{commentId}")
     suspend fun deleteComment(
         @Path("cardId") cardId: String,
         @Path("commentId") commentId: String,
-    )
+    ): CardDto
 }

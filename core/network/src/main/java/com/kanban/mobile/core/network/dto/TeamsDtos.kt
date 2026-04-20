@@ -1,5 +1,6 @@
 package com.kanban.mobile.core.network.dto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -10,7 +11,7 @@ data class TeamDto(
 
 @Serializable
 data class TeamMemberDto(
-    val userId: String,
+    @SerialName("id") val userId: String,
     val role: String,
     val email: String? = null,
     val name: String? = null,
@@ -39,7 +40,7 @@ data class PatchTeamMemberRequestDto(
 
 @Serializable
 data class InviteCandidateDto(
-    val userId: String,
+    @SerialName("id") val userId: String,
     val email: String? = null,
     val name: String? = null,
 )

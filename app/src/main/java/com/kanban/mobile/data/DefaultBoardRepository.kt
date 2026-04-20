@@ -125,7 +125,7 @@ class DefaultBoardRepository @Inject constructor(
                     assigneeId = assigneeId,
                     projectIds = projectIds?.takeIf { it.isNotEmpty() },
                     priority = priority,
-                    deadline = deadlineDueAt?.let { CardDeadlineDto(dueAt = it) },
+                    deadline = deadlineDueAt?.let { CardDeadlineDto(endDate = it) },
                 ),
             ).toBoardCard()
         }
@@ -149,7 +149,7 @@ class DefaultBoardRepository @Inject constructor(
                     priority = priority,
                     assigneeId = assigneeId,
                     projectIds = projectIds,
-                    deadline = deadlineDueAt?.let { CardDeadlineDto(dueAt = it) },
+                    deadline = deadlineDueAt?.let { CardDeadlineDto(endDate = it) },
                 ),
             ).toBoardCard()
         }
@@ -175,7 +175,10 @@ class DefaultBoardRepository @Inject constructor(
     override suspend fun addComment(cardId: String, text: String): Result<CardComment> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val dto = boardApi.createComment(cardId, CreateCardCommentRequestDto(text = text))
+                val card =
+                    boardApi.createComment(cardId, CreateCardCommentRequestDto(text = text))
+                val dto = card.comments.lastOrNull()
+                    ?: error("Server did not return comments on card after createComment")
                 CardComment(id = dto.id, body = dto.body, userId = dto.userId)
             }
         }
@@ -184,6 +187,7 @@ class DefaultBoardRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             runCatching {
                 boardApi.deleteComment(cardId, commentId)
+                Unit
             }
         }
 
