@@ -12,7 +12,7 @@ interface TeamsRepository {
 
     suspend fun listMembers(teamId: String): Result<List<TeamMember>>
 
-    suspend fun addMember(teamId: String, userId: String, role: TeamMemberRole?): Result<Unit>
+    suspend fun addMember(teamId: String, userId: String): Result<Unit>
 
     suspend fun patchMemberRole(teamId: String, userId: String, role: TeamMemberRole): Result<Unit>
 

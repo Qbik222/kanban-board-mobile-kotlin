@@ -50,21 +50,12 @@ class DefaultTeamsRepository @Inject constructor(
             runCatching { teamsApi.listMembers(teamId).map { it.toDomain() } }
         }
 
-    override suspend fun addMember(
-        teamId: String,
-        userId: String,
-        role: TeamMemberRole?,
-    ): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            teamsApi.addMember(
-                teamId,
-                AddTeamMemberRequestDto(
-                    userId = userId,
-                    role = role?.toApiString(),
-                ),
-            )
+    override suspend fun addMember(teamId: String, userId: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                teamsApi.addMember(teamId, AddTeamMemberRequestDto(userId = userId))
+            }
         }
-    }
 
     override suspend fun patchMemberRole(
         teamId: String,

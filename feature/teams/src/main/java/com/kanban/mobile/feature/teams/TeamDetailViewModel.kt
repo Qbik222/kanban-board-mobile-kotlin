@@ -167,7 +167,7 @@ class TeamDetailViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _uiState.update { it.copy(pendingMutation = true) }
-            teamsRepository.addMember(teamId, raw, role = TeamMemberRole.MEMBER).fold(
+            teamsRepository.addMember(teamId, raw).fold(
                 onSuccess = {
                     _effects.tryEmit("Member added")
                     _uiState.update {

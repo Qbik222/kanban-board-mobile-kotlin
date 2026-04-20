@@ -30,7 +30,6 @@ data class PatchTeamRequestDto(
 @Serializable
 data class AddTeamMemberRequestDto(
     val userId: String,
-    val role: String? = null,
 )
 
 @Serializable
