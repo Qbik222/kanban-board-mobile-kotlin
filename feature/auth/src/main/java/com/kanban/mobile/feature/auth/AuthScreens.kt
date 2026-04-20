@@ -160,6 +160,7 @@ fun MainPlaceholderScreen(
     viewModel: MainPlaceholderViewModel,
     userLabel: String?,
     onLogout: () -> Unit,
+    onOpenTeams: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -173,9 +174,15 @@ fun MainPlaceholderScreen(
             style = MaterialTheme.typography.bodyLarge,
         )
         Text(
-            text = "Teams and boards will appear here in the next milestones.",
+            text = "Boards will appear here in a later milestone.",
             style = MaterialTheme.typography.bodyMedium,
         )
+        Button(
+            onClick = onOpenTeams,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Teams")
+        }
         Button(
             onClick = {
                 viewModel.logout(onLogout)

@@ -5,9 +5,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.kanban.mobile.core.session.SessionState
 import com.kanban.mobile.feature.auth.LoginScreen
 import com.kanban.mobile.feature.auth.LoginViewModel
@@ -18,6 +20,8 @@ import com.kanban.mobile.feature.auth.RegisterViewModel
 import com.kanban.mobile.feature.auth.SplashDestination
 import com.kanban.mobile.feature.auth.SplashScreen
 import com.kanban.mobile.feature.auth.SplashViewModel
+import com.kanban.mobile.feature.teams.TeamDetailScreen
+import com.kanban.mobile.feature.teams.TeamsListScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
@@ -109,6 +113,25 @@ private fun KanbanNavHost(
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
+                onOpenTeams = { navController.navigate(AppRoutes.Teams) },
+            )
+        }
+        composable(AppRoutes.Teams) {
+            TeamsListScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToTeam = { teamId ->
+                    navController.navigate(AppRoutes.teamDetail(teamId))
+                },
+            )
+        }
+        composable(
+            route = AppRoutes.TeamDetail,
+            arguments = listOf(
+                navArgument("teamId") { type = NavType.StringType },
+            ),
+        ) {
+            TeamDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
     }

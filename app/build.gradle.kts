@@ -52,6 +52,7 @@ dependencies {
     implementation(project(":core:network"))
     implementation(project(":core:session"))
     implementation(project(":feature:auth"))
+    implementation(project(":feature:teams"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
