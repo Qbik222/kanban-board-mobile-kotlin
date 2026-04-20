@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -36,6 +37,11 @@ class DataStoreSessionRepository(
 
     private val _invalidated = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     override val sessionInvalidatedEvents: SharedFlow<Unit> = _invalidated.asSharedFlow()
+
+    override val accessTokenFlow: Flow<String?> =
+        dataStore.data
+            .map { prefs -> prefs[keyAccessToken]?.takeIf { it.isNotBlank() } }
+            .distinctUntilChanged()
 
     init {
         scope.launch {

@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.hilt.android)
     kotlin("kapt")
@@ -28,6 +29,7 @@ android {
 
 dependencies {
     implementation(project(":core:network"))
+    implementation(project(":core:realtime"))
     implementation(project(":core:session"))
     implementation(project(":feature:teams"))
 
@@ -48,6 +50,7 @@ dependencies {
     kapt(libs.hilt.compiler)
 
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
 }
 
 kapt {

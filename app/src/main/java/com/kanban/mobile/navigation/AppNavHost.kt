@@ -181,6 +181,11 @@ private fun KanbanNavHost(
                 onNavigateToSettings = {
                     navController.navigate(AppRoutes.boardSettings(boardId))
                 },
+                onNavigateToBoards = {
+                    navController.navigate(AppRoutes.Boards) {
+                        popUpTo(AppRoutes.Boards) { inclusive = true }
+                    }
+                },
             )
         }
         composable(
@@ -210,6 +215,11 @@ private fun KanbanNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToSettings = {
                     navController.navigate(AppRoutes.boardSettings(boardId))
+                },
+                onNavigateToBoards = {
+                    navController.navigate(AppRoutes.Boards) {
+                        popUpTo(AppRoutes.Boards) { inclusive = true }
+                    }
                 },
             )
         }

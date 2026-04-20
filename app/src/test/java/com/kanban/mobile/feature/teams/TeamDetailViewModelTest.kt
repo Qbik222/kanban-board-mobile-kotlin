@@ -10,6 +10,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -84,6 +85,7 @@ class TeamDetailViewModelTest {
         every { session.sessionState } returns MutableStateFlow(
             SessionState.Authenticated(userId = "u1", email = "me@x.co"),
         )
+        every { session.accessTokenFlow } returns flowOf(null)
         return session
     }
 }

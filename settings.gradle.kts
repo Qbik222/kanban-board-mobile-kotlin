@@ -21,6 +21,7 @@ rootProject.name = "KanbanMobile"
 
 include(":app")
 include(":core:network")
+include(":core:realtime")
 include(":core:session")
 include(":feature:auth")
 include(":feature:teams")

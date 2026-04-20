@@ -3,6 +3,8 @@ package com.kanban.mobile.feature.boards
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kanban.mobile.core.realtime.BoardRealtimeClient
+import com.kanban.mobile.core.realtime.BoardRealtimeEvent
 import com.kanban.mobile.core.session.SessionRepository
 import com.kanban.mobile.core.session.SessionState
 import com.kanban.mobile.feature.boards.permissions.BoardPermission
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 
 data class CardDraft(
     val title: String,
@@ -48,6 +51,8 @@ class BoardDetailViewModel @Inject constructor(
     private val boardRepository: BoardRepository,
     private val sessionRepository: SessionRepository,
     private val teamsRepository: TeamsRepository,
+    private val boardRealtimeClient: BoardRealtimeClient,
+    private val json: Json,
 ) : ViewModel() {
 
     private val boardId: String = savedStateHandle.get<String>("boardId")!!
@@ -56,11 +61,22 @@ class BoardDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(BoardDetailUiState())
     val uiState: StateFlow<BoardDetailUiState> = _uiState.asStateFlow()
 
-    private val _effects = MutableSharedFlow<String>(extraBufferCapacity = 8)
-    val effects: SharedFlow<String> = _effects.asSharedFlow()
+    private val _effects = MutableSharedFlow<BoardDetailEffect>(extraBufferCapacity = 8)
+    val effects: SharedFlow<BoardDetailEffect> = _effects.asSharedFlow()
+
+    @Volatile
+    private var teamAdminCached: Boolean = false
 
     init {
         load()
+        viewModelScope.launch {
+            boardRealtimeClient.events.collect { event -> handleRealtimeEvent(event) }
+        }
+    }
+
+    override fun onCleared() {
+        boardRealtimeClient.leaveBoard()
+        super.onCleared()
     }
 
     fun refresh() {
@@ -101,11 +117,11 @@ class BoardDetailViewModel @Inject constructor(
         val draft = _uiState.value.cardDraft ?: return
         val cardId = _uiState.value.selectedCardId ?: return
         if (!can(BoardPermission.UPDATE_CARD)) {
-            _effects.tryEmit("No permission to edit cards")
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to edit cards"))
             return
         }
         if (draft.title.trim().isEmpty()) {
-            _effects.tryEmit("Title is required")
+            _effects.tryEmit(BoardDetailEffect.Snackbar("Title is required"))
             return
         }
         viewModelScope.launch {
@@ -130,10 +146,10 @@ class BoardDetailViewModel @Inject constructor(
                         val b = st.board ?: return@update st
                         st.copy(board = KanbanBoardReducer.patchCard(b, updated))
                     }
-                    _effects.tryEmit("Saved")
+                    _effects.tryEmit(BoardDetailEffect.Snackbar("Saved"))
                 },
                 onFailure = { e ->
-                    _effects.tryEmit(e.message ?: "Save failed")
+                    _effects.tryEmit(BoardDetailEffect.Snackbar(e.message ?: "Save failed"))
                 },
             )
         }
@@ -142,7 +158,7 @@ class BoardDetailViewModel @Inject constructor(
     fun deleteSelectedCard() {
         val cardId = _uiState.value.selectedCardId ?: return
         if (!can(BoardPermission.DELETE_CARD)) {
-            _effects.tryEmit("No permission to delete cards")
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to delete cards"))
             return
         }
         viewModelScope.launch {
@@ -155,7 +171,7 @@ class BoardDetailViewModel @Inject constructor(
                 onSuccess = { },
                 onFailure = {
                     _uiState.update { it.copy(board = snapshot) }
-                    _effects.tryEmit(it.message ?: "Delete failed")
+                    _effects.tryEmit(BoardDetailEffect.Snackbar(it.message ?: "Delete failed"))
                 },
             )
         }
@@ -163,7 +179,7 @@ class BoardDetailViewModel @Inject constructor(
 
     fun createCard(columnId: String) {
         if (!can(BoardPermission.CREATE_CARD)) {
-            _effects.tryEmit("No permission to create cards")
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to create cards"))
             return
         }
         viewModelScope.launch {
@@ -182,7 +198,7 @@ class BoardDetailViewModel @Inject constructor(
                         st.copy(board = KanbanBoardReducer.addCard(b, card))
                     }
                 },
-                onFailure = { _effects.tryEmit(it.message ?: "Create failed") },
+                onFailure = { _effects.tryEmit(BoardDetailEffect.Snackbar(it.message ?: "Create failed")) },
             )
         }
     }
@@ -191,7 +207,7 @@ class BoardDetailViewModel @Inject constructor(
         val t = title.trim()
         if (t.isEmpty()) return
         if (!can(BoardPermission.CREATE_COLUMN)) {
-            _effects.tryEmit("No permission to create columns")
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to create columns"))
             return
         }
         viewModelScope.launch {
@@ -202,7 +218,7 @@ class BoardDetailViewModel @Inject constructor(
                         st.copy(board = KanbanBoardReducer.upsertColumn(b, col))
                     }
                 },
-                onFailure = { _effects.tryEmit(it.message ?: "Column create failed") },
+                onFailure = { _effects.tryEmit(BoardDetailEffect.Snackbar(it.message ?: "Column create failed")) },
             )
         }
     }
@@ -211,7 +227,7 @@ class BoardDetailViewModel @Inject constructor(
         val t = newTitle.trim()
         if (t.isEmpty()) return
         if (!can(BoardPermission.UPDATE_COLUMN)) {
-            _effects.tryEmit("No permission to edit columns")
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to edit columns"))
             return
         }
         viewModelScope.launch {
@@ -222,14 +238,14 @@ class BoardDetailViewModel @Inject constructor(
             }
             boardRepository.renameColumn(columnId, t).onFailure { e ->
                 _uiState.update { it.copy(board = prev) }
-                _effects.tryEmit(e.message ?: "Rename failed")
+                _effects.tryEmit(BoardDetailEffect.Snackbar(e.message ?: "Rename failed"))
             }
         }
     }
 
     fun deleteColumn(columnId: String) {
         if (!can(BoardPermission.DELETE_COLUMN)) {
-            _effects.tryEmit("No permission to delete columns")
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to delete columns"))
             return
         }
         viewModelScope.launch {
@@ -240,14 +256,14 @@ class BoardDetailViewModel @Inject constructor(
             }
             boardRepository.deleteColumn(columnId).onFailure { e ->
                 _uiState.update { it.copy(board = prev) }
-                _effects.tryEmit(e.message ?: "Delete column failed")
+                _effects.tryEmit(BoardDetailEffect.Snackbar(e.message ?: "Delete column failed"))
             }
         }
     }
 
     fun moveColumn(columnId: String, delta: Int) {
         if (!can(BoardPermission.REORDER_COLUMNS)) {
-            _effects.tryEmit("No permission to reorder columns")
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to reorder columns"))
             return
         }
         val board = _uiState.value.board ?: return
@@ -269,14 +285,14 @@ class BoardDetailViewModel @Inject constructor(
             }
             boardRepository.reorderColumns(pairs).onFailure { e ->
                 _uiState.update { it.copy(board = snapshot) }
-                _effects.tryEmit(e.message ?: "Reorder failed")
+                _effects.tryEmit(BoardDetailEffect.Snackbar(e.message ?: "Reorder failed"))
             }
         }
     }
 
     fun moveCardWithinColumn(cardId: String, delta: Int) {
         if (!can(BoardPermission.MOVE_CARD)) {
-            _effects.tryEmit("No permission to move cards")
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to move cards"))
             return
         }
         val board = _uiState.value.board ?: return
@@ -290,7 +306,7 @@ class BoardDetailViewModel @Inject constructor(
 
     fun moveCardToColumn(cardId: String, targetColumnId: String) {
         if (!can(BoardPermission.MOVE_CARD)) {
-            _effects.tryEmit("No permission to move cards")
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to move cards"))
             return
         }
         val board = _uiState.value.board ?: return
@@ -322,7 +338,7 @@ class BoardDetailViewModel @Inject constructor(
                 },
                 onFailure = { e ->
                     _uiState.update { it.copy(board = snapshot) }
-                    _effects.tryEmit(e.message ?: "Move failed")
+                    _effects.tryEmit(BoardDetailEffect.Snackbar(e.message ?: "Move failed"))
                 },
             )
         }
@@ -333,7 +349,7 @@ class BoardDetailViewModel @Inject constructor(
         val text = _uiState.value.newCommentText.trim()
         if (text.isEmpty()) return
         if (!can(BoardPermission.COMMENT_CREATE)) {
-            _effects.tryEmit("No permission to comment")
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to comment"))
             return
         }
         viewModelScope.launch {
@@ -347,7 +363,7 @@ class BoardDetailViewModel @Inject constructor(
                         )
                     }
                 },
-                onFailure = { _effects.tryEmit(it.message ?: "Comment failed") },
+                onFailure = { _effects.tryEmit(BoardDetailEffect.Snackbar(it.message ?: "Comment failed")) },
             )
         }
     }
@@ -362,8 +378,62 @@ class BoardDetailViewModel @Inject constructor(
                         st.copy(board = KanbanBoardReducer.removeComment(b, cardId, commentId))
                     }
                 },
-                onFailure = { _effects.tryEmit(it.message ?: "Delete comment failed") },
+                onFailure = { _effects.tryEmit(BoardDetailEffect.Snackbar(it.message ?: "Delete comment failed")) },
             )
+        }
+    }
+
+    private fun handleRealtimeEvent(event: BoardRealtimeEvent) {
+        when (event) {
+            is BoardRealtimeEvent.BoardJoinError -> handleJoinError(event)
+            is BoardRealtimeEvent.SocketConnectError -> {
+                _effects.tryEmit(
+                    BoardDetailEffect.Snackbar(
+                        "Realtime недоступний, зміни можуть не синхронізуватись (${event.message})",
+                    ),
+                )
+            }
+            BoardRealtimeEvent.BoardJoined,
+            BoardRealtimeEvent.SocketConnected,
+            BoardRealtimeEvent.SocketDisconnected,
+            -> Unit
+            else -> {
+                val r = BoardSocketReducer.reduce(_uiState.value.board, event, json)
+                applySocketReduceResult(r)
+            }
+        }
+    }
+
+    private fun handleJoinError(event: BoardRealtimeEvent.BoardJoinError) {
+        val msg = event.message.lowercase()
+        when {
+            "unauthorized" in msg -> sessionRepository.notifySessionInvalidated()
+            "forbidden" in msg -> {
+                _effects.tryEmit(BoardDetailEffect.NavigateToBoards)
+                _effects.tryEmit(BoardDetailEffect.Snackbar("Немає доступу до дошки"))
+            }
+            else -> _effects.tryEmit(BoardDetailEffect.Snackbar(event.message))
+        }
+    }
+
+    private fun applySocketReduceResult(r: BoardSocketReduceResult) {
+        r.effects.forEach { _effects.tryEmit(it) }
+        val nb = r.nextBoard
+        val navigatesAway = r.effects.any { it is BoardDetailEffect.NavigateToBoards }
+        _uiState.update { st ->
+            if (nb == null && navigatesAway) {
+                return@update st.copy(
+                    board = null,
+                    loading = false,
+                    error = null,
+                    selectedCardId = null,
+                    cardDraft = null,
+                )
+            }
+            if (nb == null) return@update st
+            val userId = (sessionRepository.sessionState.value as? SessionState.Authenticated)?.userId
+            val role = resolveEffectiveBoardRole(nb, userId, teamAdminCached)
+            st.copy(board = nb, effectiveRole = role)
         }
     }
 
@@ -391,13 +461,16 @@ class BoardDetailViewModel @Inject constructor(
                     if (initialCardId != null) {
                         selectCard(initialCardId)
                     }
+                    teamAdminCached = teamAdmin
+                    boardRealtimeClient.connectIfNeeded()
+                    boardRealtimeClient.joinBoard(boardId)
                 },
                 onFailure = { e ->
                     val message = e.message ?: "Failed to load board"
                     _uiState.update {
                         it.copy(loading = false, board = null, error = message)
                     }
-                    _effects.tryEmit(message)
+                    _effects.tryEmit(BoardDetailEffect.Snackbar(message))
                 },
             )
         }

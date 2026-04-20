@@ -27,6 +27,10 @@ import com.kanban.mobile.feature.boards.BoardRepository
 import com.kanban.mobile.feature.boards.BoardRole
 import com.kanban.mobile.feature.boards.BoardSummary
 import com.kanban.mobile.feature.boards.CardComment
+import com.kanban.mobile.feature.boards.toBoardCard
+import com.kanban.mobile.feature.boards.toBoardColumn
+import com.kanban.mobile.feature.boards.toDomain
+import com.kanban.mobile.feature.boards.toMember
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -73,7 +77,7 @@ class DefaultBoardRepository @Inject constructor(
     override suspend fun createColumn(boardId: String, title: String): Result<BoardColumn> =
         withContext(Dispatchers.IO) {
             runCatching {
-                boardApi.createColumn(CreateColumnRequestDto(title = title, boardId = boardId)).toDomain()
+                boardApi.createColumn(CreateColumnRequestDto(title = title, boardId = boardId)).toBoardColumn()
             }
         }
 
@@ -123,7 +127,7 @@ class DefaultBoardRepository @Inject constructor(
                     priority = priority,
                     deadline = deadlineDueAt?.let { CardDeadlineDto(dueAt = it) },
                 ),
-            ).toCard()
+            ).toBoardCard()
         }
     }
 
@@ -147,7 +151,7 @@ class DefaultBoardRepository @Inject constructor(
                     projectIds = projectIds,
                     deadline = deadlineDueAt?.let { CardDeadlineDto(dueAt = it) },
                 ),
-            ).toCard()
+            ).toBoardCard()
         }
     }
 
@@ -157,7 +161,7 @@ class DefaultBoardRepository @Inject constructor(
         newOrder: Int,
     ): Result<BoardCard> = withContext(Dispatchers.IO) {
         runCatching {
-            boardApi.moveCard(cardId, MoveCardRequestDto(targetColumnId, newOrder)).toCard()
+            boardApi.moveCard(cardId, MoveCardRequestDto(targetColumnId, newOrder)).toBoardCard()
         }
     }
 
@@ -252,54 +256,4 @@ class DefaultBoardRepository @Inject constructor(
             detailsCache[boardId] = cached.copy(members = members)
         }
     }
-
-    private fun BoardSummaryDto.toDomain(): BoardSummary =
-        BoardSummary(
-            id = id,
-            title = title,
-            teamId = teamId,
-            ownerId = ownerId,
-            projectIds = projectIds,
-        )
-
-    private fun BoardDetailsDto.toDomain(): BoardDetails =
-        BoardDetails(
-            id = id,
-            title = title,
-            teamId = teamId,
-            ownerId = ownerId,
-            projectIds = projectIds,
-            members = members.map { it.toMember() },
-            columns = columns.sortedBy { it.order }.map { it.toDomain() },
-        )
-
-    private fun ColumnDto.toDomain(): BoardColumn =
-        BoardColumn(
-            id = id,
-            title = title,
-            order = order,
-            cards = cards.sortedBy { it.order }.map { it.toCard(columnId = id) },
-        )
-
-    private fun BoardMemberDto.toMember(): BoardMember =
-        BoardMember(
-            userId = userId,
-            role = BoardRole.fromApi(role),
-            email = email,
-            name = name,
-        )
-
-    private fun CardDto.toCard(columnId: String? = null): BoardCard =
-        BoardCard(
-            id = id,
-            title = title,
-            description = description,
-            priority = priority,
-            columnId = columnId ?: this.columnId ?: error("card ${id} missing columnId"),
-            order = order,
-            assigneeId = assigneeId,
-            projectIds = projectIds,
-            comments = comments.map { CardComment(id = it.id, body = it.body, userId = it.userId) },
-            deadlineDueAt = deadline?.dueAt,
-        )
 }

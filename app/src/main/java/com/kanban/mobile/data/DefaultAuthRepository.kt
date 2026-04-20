@@ -2,6 +2,7 @@ package com.kanban.mobile.data
 
 import com.kanban.mobile.core.network.AuthApi
 import com.kanban.mobile.core.network.ClearableCookieJar
+import com.kanban.mobile.core.realtime.BoardRealtimeClient
 import com.kanban.mobile.core.network.dto.LoginRequestDto
 import com.kanban.mobile.core.network.dto.RegisterRequestDto
 import com.kanban.mobile.core.session.SessionRepository
@@ -14,6 +15,7 @@ class DefaultAuthRepository @Inject constructor(
     private val authApi: AuthApi,
     private val sessionRepository: SessionRepository,
     private val cookieJar: ClearableCookieJar,
+    private val boardRealtimeClient: BoardRealtimeClient,
 ) : AuthRepository {
 
     override suspend fun login(email: String, password: String): Result<Unit> = runCatching {
@@ -53,6 +55,7 @@ class DefaultAuthRepository @Inject constructor(
             // still clear local session
         }
         sessionRepository.clearSession()
+        boardRealtimeClient.disconnect()
         cookieJar.clear()
     }
 }

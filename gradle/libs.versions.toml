@@ -19,6 +19,8 @@ junitExt = "1.2.1"
 mockk = "1.13.13"
 turbine = "1.2.0"
 archCoreTesting = "2.2.0"
+# Must match backend socket.io major (Engine.IO). Server v4 → client 2.1.x; verify in backend package.json.
+socketIoClient = "2.1.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -53,6 +55,8 @@ androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "j
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "archCoreTesting" }
+
+socket-io-client = { group = "io.socket", name = "socket.io-client", version.ref = "socketIoClient" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

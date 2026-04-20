@@ -65,6 +65,7 @@ fun BoardDetailScreen(
     viewModel: BoardDetailViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToBoards: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -75,8 +76,11 @@ fun BoardDetailScreen(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.effects.collect { message ->
-            snackbarHostState.showSnackbar(message)
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is BoardDetailEffect.Snackbar -> snackbarHostState.showSnackbar(effect.message)
+                BoardDetailEffect.NavigateToBoards -> onNavigateToBoards()
+            }
         }
     }
 

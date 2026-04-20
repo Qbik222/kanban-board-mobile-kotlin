@@ -1,6 +1,7 @@
 package com.kanban.mobile.feature.boards
 
 import androidx.lifecycle.SavedStateHandle
+import com.kanban.mobile.core.realtime.BoardRealtimeClient
 import com.kanban.mobile.core.session.SessionRepository
 import com.kanban.mobile.core.session.SessionState
 import com.kanban.mobile.feature.teams.TeamMember
@@ -12,11 +13,13 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -91,12 +94,18 @@ class BoardDetailViewModelMoveTest {
         every { sessionRepository.sessionState } returns MutableStateFlow(
             SessionState.Authenticated(userId = "owner", email = "a@a.com"),
         )
+        every { sessionRepository.accessTokenFlow } returns flowOf("token")
+        val realtime = mockk<BoardRealtimeClient>(relaxed = true)
+        every { realtime.events } returns flowOf()
+        val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
         val vm = BoardDetailViewModel(
             SavedStateHandle(mapOf("boardId" to "b1")),
             repo,
             sessionRepository,
             teamsRepository,
+            realtime,
+            json,
         )
         advanceUntilIdle()
 
@@ -125,12 +134,18 @@ class BoardDetailViewModelMoveTest {
         every { sessionRepository.sessionState } returns MutableStateFlow(
             SessionState.Authenticated(userId = "owner", email = null),
         )
+        every { sessionRepository.accessTokenFlow } returns flowOf("token")
+        val realtime = mockk<BoardRealtimeClient>(relaxed = true)
+        every { realtime.events } returns flowOf()
+        val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
         val vm = BoardDetailViewModel(
             SavedStateHandle(mapOf("boardId" to "b1")),
             repo,
             sessionRepository,
             teamsRepository,
+            realtime,
+            json,
         )
         advanceUntilIdle()
 

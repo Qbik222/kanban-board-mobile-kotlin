@@ -50,6 +50,7 @@ android {
 
 dependencies {
     implementation(project(":core:network"))
+    implementation(project(":core:realtime"))
     implementation(project(":core:session"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:teams"))

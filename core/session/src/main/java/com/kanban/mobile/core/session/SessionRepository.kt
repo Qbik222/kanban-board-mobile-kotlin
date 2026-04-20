@@ -1,10 +1,14 @@
 package com.kanban.mobile.core.session
 
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 interface SessionRepository {
     val sessionState: StateFlow<SessionState>
+
+    /** Raw access token from DataStore; updates when refresh writes a new token. */
+    val accessTokenFlow: Flow<String?>
 
     /** In-memory + DataStore; use from coroutines. */
     suspend fun getAccessToken(): String?

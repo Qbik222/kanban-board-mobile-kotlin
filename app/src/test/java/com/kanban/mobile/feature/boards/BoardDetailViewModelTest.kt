@@ -1,6 +1,7 @@
 package com.kanban.mobile.feature.boards
 
 import androidx.lifecycle.SavedStateHandle
+import com.kanban.mobile.core.realtime.BoardRealtimeClient
 import com.kanban.mobile.core.session.SessionRepository
 import com.kanban.mobile.core.session.SessionState
 import com.kanban.mobile.feature.teams.TeamsRepository
@@ -8,6 +9,7 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -15,6 +17,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -84,12 +87,18 @@ class BoardDetailViewModelTest {
         coEvery { repo.getBoard("b1") } returns Result.success(details)
         coEvery { teamsRepository.listMembers("t1") } returns Result.success(emptyList())
         every { sessionRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
+        every { sessionRepository.accessTokenFlow } returns flowOf(null)
+        val realtime = mockk<BoardRealtimeClient>(relaxed = true)
+        every { realtime.events } returns flowOf()
+        val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
         val vm = BoardDetailViewModel(
             SavedStateHandle(mapOf("boardId" to "b1")),
             repo,
             sessionRepository,
             teamsRepository,
+            realtime,
+            json,
         )
         advanceUntilIdle()
         assertNotNull(vm.uiState.value.board)
@@ -108,12 +117,18 @@ class BoardDetailViewModelTest {
         val teamsRepository = mockk<TeamsRepository>()
         coEvery { repo.getBoard("b1") } returns Result.failure(IllegalStateException("offline"))
         every { sessionRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
+        every { sessionRepository.accessTokenFlow } returns flowOf(null)
+        val realtime = mockk<BoardRealtimeClient>(relaxed = true)
+        every { realtime.events } returns flowOf()
+        val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
         val vm = BoardDetailViewModel(
             SavedStateHandle(mapOf("boardId" to "b1")),
             repo,
             sessionRepository,
             teamsRepository,
+            realtime,
+            json,
         )
         advanceUntilIdle()
         assertEquals("offline", vm.uiState.value.error)

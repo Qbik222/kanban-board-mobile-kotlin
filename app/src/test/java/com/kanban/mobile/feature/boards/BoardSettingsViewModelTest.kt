@@ -14,6 +14,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -62,6 +63,7 @@ class BoardSettingsViewModelTest {
         every { session.sessionState } returns MutableStateFlow(
             SessionState.Authenticated(userId = "owner-1", email = "o@test"),
         )
+        every { session.accessTokenFlow } returns flowOf(null)
         val teams = mockk<TeamsRepository>()
         coEvery { teams.listMembers("t1") } returns Result.success(emptyList())
 
@@ -90,6 +92,7 @@ class BoardSettingsViewModelTest {
         every { session.sessionState } returns MutableStateFlow(
             SessionState.Authenticated(userId = "owner-1", email = "o@test"),
         )
+        every { session.accessTokenFlow } returns flowOf(null)
         val teams = mockk<TeamsRepository>()
         coEvery { teams.listMembers("t1") } returns Result.success(emptyList())
 
@@ -120,6 +123,7 @@ class BoardSettingsViewModelTest {
         every { session.sessionState } returns MutableStateFlow(
             SessionState.Authenticated(userId = "owner-1", email = "o@test"),
         )
+        every { session.accessTokenFlow } returns flowOf(null)
         val teams = mockk<TeamsRepository>()
         coEvery { teams.listMembers("t1") } returns Result.success(emptyList())
 
@@ -149,6 +153,7 @@ class BoardSettingsViewModelTest {
         every { session.sessionState } returns MutableStateFlow(
             SessionState.Authenticated(userId = "owner-1", email = "o@test"),
         )
+        every { session.accessTokenFlow } returns flowOf(null)
         val teams = mockk<TeamsRepository>()
         coEvery { teams.listMembers("t1") } returns Result.success(
             listOf(TeamMember("owner-1", null, null, TeamMemberRole.ADMIN)),
