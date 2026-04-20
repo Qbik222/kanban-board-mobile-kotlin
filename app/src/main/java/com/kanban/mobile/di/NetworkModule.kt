@@ -2,6 +2,7 @@ package com.kanban.mobile.di
 
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.kanban.mobile.core.network.AuthApi
+import com.kanban.mobile.core.network.BoardApi
 import com.kanban.mobile.core.network.TeamsApi
 import com.kanban.mobile.core.network.BearerAuthInterceptor
 import com.kanban.mobile.core.network.ClearableCookieJar
@@ -142,4 +143,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideTeamsApi(retrofit: Retrofit): TeamsApi = retrofit.create(TeamsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideBoardApi(retrofit: Retrofit): BoardApi = retrofit.create(BoardApi::class.java)
 }

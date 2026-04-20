@@ -20,6 +20,9 @@ import com.kanban.mobile.feature.auth.RegisterViewModel
 import com.kanban.mobile.feature.auth.SplashDestination
 import com.kanban.mobile.feature.auth.SplashScreen
 import com.kanban.mobile.feature.auth.SplashViewModel
+import com.kanban.mobile.feature.boards.BoardDetailScreen
+import com.kanban.mobile.feature.boards.BoardsListScreen
+import com.kanban.mobile.feature.boards.CreateBoardScreen
 import com.kanban.mobile.feature.teams.TeamDetailScreen
 import com.kanban.mobile.feature.teams.TeamsListScreen
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -114,6 +117,7 @@ private fun KanbanNavHost(
                     }
                 },
                 onOpenTeams = { navController.navigate(AppRoutes.Teams) },
+                onOpenBoards = { navController.navigate(AppRoutes.Boards) },
             )
         }
         composable(AppRoutes.Teams) {
@@ -131,6 +135,46 @@ private fun KanbanNavHost(
             ),
         ) {
             TeamDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+        composable(AppRoutes.Boards) {
+            BoardsListScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToBoard = { boardId ->
+                    navController.navigate(AppRoutes.boardDetail(boardId))
+                },
+                onNavigateToCreate = {
+                    navController.navigate(AppRoutes.boardCreate())
+                },
+            )
+        }
+        composable(
+            route = AppRoutes.BoardCreate,
+            arguments = listOf(
+                navArgument("teamId") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) {
+            CreateBoardScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onBoardCreated = { boardId ->
+                    navController.navigate(AppRoutes.boardDetail(boardId)) {
+                        popUpTo(AppRoutes.Boards) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
+            )
+        }
+        composable(
+            route = AppRoutes.BoardDetail,
+            arguments = listOf(
+                navArgument("boardId") { type = NavType.StringType },
+            ),
+        ) {
+            BoardDetailScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }

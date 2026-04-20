@@ -8,5 +8,18 @@ object AppRoutes {
     const val Teams = "teams"
     const val TeamDetail = "teams/{teamId}"
 
+    const val Boards = "boards"
+    const val BoardDetail = "boards/{boardId}"
+    const val BoardCreate = "boards/create?teamId={teamId}"
+
     fun teamDetail(teamId: String): String = "teams/$teamId"
+
+    fun boardDetail(boardId: String): String = "boards/$boardId"
+
+    fun boardCreate(teamId: String = ""): String =
+        if (teamId.isEmpty()) {
+            "boards/create?teamId="
+        } else {
+            "boards/create?teamId=$teamId"
+        }
 }

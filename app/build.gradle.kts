@@ -53,6 +53,7 @@ dependencies {
     implementation(project(":core:session"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:teams"))
+    implementation(project(":feature:boards"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

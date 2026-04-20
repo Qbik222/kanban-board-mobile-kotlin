@@ -161,6 +161,7 @@ fun MainPlaceholderScreen(
     userLabel: String?,
     onLogout: () -> Unit,
     onOpenTeams: () -> Unit,
+    onOpenBoards: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -174,9 +175,15 @@ fun MainPlaceholderScreen(
             style = MaterialTheme.typography.bodyLarge,
         )
         Text(
-            text = "Boards will appear here in a later milestone.",
+            text = "Open boards to view and create Kanban boards.",
             style = MaterialTheme.typography.bodyMedium,
         )
+        Button(
+            onClick = onOpenBoards,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Boards")
+        }
         Button(
             onClick = onOpenTeams,
             modifier = Modifier.fillMaxWidth(),
