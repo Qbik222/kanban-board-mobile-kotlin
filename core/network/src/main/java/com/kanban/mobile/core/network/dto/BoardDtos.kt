@@ -29,6 +29,25 @@ data class CreateBoardRequestDto(
 data class BoardMemberDto(
     val userId: String,
     val role: String,
+    val id: String? = null,
+    val email: String? = null,
+    val name: String? = null,
+)
+
+@Serializable
+data class PatchBoardRequestDto(
+    val title: String? = null,
+    val projectIds: List<String>? = null,
+)
+
+@Serializable
+data class InviteBoardMemberRequestDto(
+    val userId: String,
+)
+
+@Serializable
+data class PatchBoardMemberRoleRequestDto(
+    val role: String,
 )
 
 @Serializable

@@ -53,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kanban.mobile.feature.boards.permissions.BoardPermission
 
@@ -63,9 +64,15 @@ private const val DESCRIPTION_PREVIEW_CHARS = 120
 fun BoardDetailScreen(
     viewModel: BoardDetailViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.effects.collect { message ->
@@ -91,7 +98,7 @@ fun BoardDetailScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = { }) {
+                    TextButton(onClick = onNavigateToSettings) {
                         Text("Settings")
                     }
                 },

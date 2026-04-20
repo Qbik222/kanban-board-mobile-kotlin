@@ -10,7 +10,10 @@ import com.kanban.mobile.core.network.dto.CreateBoardRequestDto
 import com.kanban.mobile.core.network.dto.CreateCardCommentRequestDto
 import com.kanban.mobile.core.network.dto.CreateCardRequestDto
 import com.kanban.mobile.core.network.dto.CreateColumnRequestDto
+import com.kanban.mobile.core.network.dto.InviteBoardMemberRequestDto
 import com.kanban.mobile.core.network.dto.MoveCardRequestDto
+import com.kanban.mobile.core.network.dto.PatchBoardMemberRoleRequestDto
+import com.kanban.mobile.core.network.dto.PatchBoardRequestDto
 import com.kanban.mobile.core.network.dto.PatchCardRequestDto
 import com.kanban.mobile.core.network.dto.PatchColumnRequestDto
 import com.kanban.mobile.core.network.dto.ReorderColumnsRequestDto
@@ -34,6 +37,34 @@ interface BoardApi {
 
     @GET("boards/{boardId}/members")
     suspend fun getBoardMembers(@Path("boardId") boardId: String): List<BoardMemberDto>
+
+    @PATCH("boards/{id}")
+    suspend fun patchBoard(
+        @Path("id") id: String,
+        @Body body: PatchBoardRequestDto,
+    )
+
+    @DELETE("boards/{id}")
+    suspend fun deleteBoard(@Path("id") id: String)
+
+    @POST("boards/{boardId}/members")
+    suspend fun inviteBoardMember(
+        @Path("boardId") boardId: String,
+        @Body body: InviteBoardMemberRequestDto,
+    )
+
+    @PATCH("boards/{boardId}/members/{memberUserId}/role")
+    suspend fun patchBoardMemberRole(
+        @Path("boardId") boardId: String,
+        @Path("memberUserId") memberUserId: String,
+        @Body body: PatchBoardMemberRoleRequestDto,
+    )
+
+    @DELETE("boards/{boardId}/members/{memberUserId}")
+    suspend fun deleteBoardMember(
+        @Path("boardId") boardId: String,
+        @Path("memberUserId") memberUserId: String,
+    )
 
     @POST("columns")
     suspend fun createColumn(@Body body: CreateColumnRequestDto): ColumnDto

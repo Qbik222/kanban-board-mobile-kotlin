@@ -21,6 +21,7 @@ import com.kanban.mobile.feature.auth.SplashDestination
 import com.kanban.mobile.feature.auth.SplashScreen
 import com.kanban.mobile.feature.auth.SplashViewModel
 import com.kanban.mobile.feature.boards.BoardDetailScreen
+import com.kanban.mobile.feature.boards.BoardSettingsScreen
 import com.kanban.mobile.feature.boards.BoardsListScreen
 import com.kanban.mobile.feature.boards.CreateBoardScreen
 import com.kanban.mobile.feature.teams.TeamDetailScreen
@@ -173,9 +174,28 @@ private fun KanbanNavHost(
             arguments = listOf(
                 navArgument("boardId") { type = NavType.StringType },
             ),
-        ) {
+        ) { entry ->
+            val boardId = entry.arguments?.getString("boardId").orEmpty()
             BoardDetailScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = {
+                    navController.navigate(AppRoutes.boardSettings(boardId))
+                },
+            )
+        }
+        composable(
+            route = AppRoutes.BoardSettings,
+            arguments = listOf(
+                navArgument("boardId") { type = NavType.StringType },
+            ),
+        ) {
+            BoardSettingsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToBoardsAfterDelete = {
+                    navController.navigate(AppRoutes.Boards) {
+                        popUpTo(AppRoutes.Boards) { inclusive = true }
+                    }
+                },
             )
         }
         composable(
@@ -184,9 +204,13 @@ private fun KanbanNavHost(
                 navArgument("boardId") { type = NavType.StringType },
                 navArgument("cardId") { type = NavType.StringType },
             ),
-        ) {
+        ) { entry ->
+            val boardId = entry.arguments?.getString("boardId").orEmpty()
             BoardDetailScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = {
+                    navController.navigate(AppRoutes.boardSettings(boardId))
+                },
             )
         }
     }

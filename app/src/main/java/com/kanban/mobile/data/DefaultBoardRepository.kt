@@ -6,8 +6,12 @@ import com.kanban.mobile.core.network.dto.BoardSummaryDto
 import com.kanban.mobile.core.network.dto.CardDeadlineDto
 import com.kanban.mobile.core.network.dto.CardDto
 import com.kanban.mobile.core.network.dto.ColumnDto
+import com.kanban.mobile.core.network.dto.BoardMemberDto
 import com.kanban.mobile.core.network.dto.ColumnOrderEntryDto
 import com.kanban.mobile.core.network.dto.CreateBoardRequestDto
+import com.kanban.mobile.core.network.dto.InviteBoardMemberRequestDto
+import com.kanban.mobile.core.network.dto.PatchBoardMemberRoleRequestDto
+import com.kanban.mobile.core.network.dto.PatchBoardRequestDto
 import com.kanban.mobile.core.network.dto.CreateCardCommentRequestDto
 import com.kanban.mobile.core.network.dto.CreateCardRequestDto
 import com.kanban.mobile.core.network.dto.CreateColumnRequestDto
@@ -179,6 +183,76 @@ class DefaultBoardRepository @Inject constructor(
             }
         }
 
+    override suspend fun listBoardMembers(boardId: String): Result<List<BoardMember>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                boardApi.getBoardMembers(boardId).map { it.toMember() }
+            }
+        }
+
+    override suspend fun inviteBoardMember(boardId: String, userId: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                boardApi.inviteBoardMember(boardId, InviteBoardMemberRequestDto(userId))
+                refreshMembersCache(boardId)
+            }
+        }
+
+    override suspend fun updateBoardMemberRole(
+        boardId: String,
+        userId: String,
+        role: BoardRole,
+    ): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                boardApi.patchBoardMemberRole(
+                    boardId,
+                    userId,
+                    PatchBoardMemberRoleRequestDto(role = role.toApi()),
+                )
+                refreshMembersCache(boardId)
+            }
+        }
+
+    override suspend fun removeBoardMember(boardId: String, userId: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                boardApi.deleteBoardMember(boardId, userId)
+                refreshMembersCache(boardId)
+            }
+        }
+
+    override suspend fun updateBoard(
+        boardId: String,
+        title: String,
+        projectIds: List<String>,
+    ): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                boardApi.patchBoard(boardId, PatchBoardRequestDto(title = title, projectIds = projectIds))
+                detailsCache[boardId]?.let { cached ->
+                    detailsCache[boardId] = cached.copy(title = title, projectIds = projectIds)
+                }
+                Unit
+            }
+        }
+
+    override suspend fun deleteBoard(boardId: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                boardApi.deleteBoard(boardId)
+                detailsCache.remove(boardId)
+                Unit
+            }
+        }
+
+    private suspend fun refreshMembersCache(boardId: String) {
+        val members = boardApi.getBoardMembers(boardId).map { it.toMember() }
+        detailsCache[boardId]?.let { cached ->
+            detailsCache[boardId] = cached.copy(members = members)
+        }
+    }
+
     private fun BoardSummaryDto.toDomain(): BoardSummary =
         BoardSummary(
             id = id,
@@ -195,9 +269,7 @@ class DefaultBoardRepository @Inject constructor(
             teamId = teamId,
             ownerId = ownerId,
             projectIds = projectIds,
-            members = members.map {
-                BoardMember(userId = it.userId, role = BoardRole.fromApi(it.role))
-            },
+            members = members.map { it.toMember() },
             columns = columns.sortedBy { it.order }.map { it.toDomain() },
         )
 
@@ -207,6 +279,14 @@ class DefaultBoardRepository @Inject constructor(
             title = title,
             order = order,
             cards = cards.sortedBy { it.order }.map { it.toCard(columnId = id) },
+        )
+
+    private fun BoardMemberDto.toMember(): BoardMember =
+        BoardMember(
+            userId = userId,
+            role = BoardRole.fromApi(role),
+            email = email,
+            name = name,
         )
 
     private fun CardDto.toCard(columnId: String? = null): BoardCard =

@@ -22,11 +22,15 @@ enum class BoardRole {
                 else -> VIEWER
             }
     }
+
+    fun toApi(): String = name
 }
 
 data class BoardMember(
     val userId: String,
     val role: BoardRole,
+    val email: String? = null,
+    val name: String? = null,
 )
 
 data class BoardDetails(

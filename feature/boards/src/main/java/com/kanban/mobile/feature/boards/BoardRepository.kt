@@ -47,4 +47,24 @@ interface BoardRepository {
     suspend fun addComment(cardId: String, text: String): Result<CardComment>
 
     suspend fun deleteComment(cardId: String, commentId: String): Result<Unit>
+
+    suspend fun listBoardMembers(boardId: String): Result<List<BoardMember>>
+
+    suspend fun inviteBoardMember(boardId: String, userId: String): Result<Unit>
+
+    suspend fun updateBoardMemberRole(
+        boardId: String,
+        userId: String,
+        role: BoardRole,
+    ): Result<Unit>
+
+    suspend fun removeBoardMember(boardId: String, userId: String): Result<Unit>
+
+    suspend fun updateBoard(
+        boardId: String,
+        title: String,
+        projectIds: List<String>,
+    ): Result<Unit>
+
+    suspend fun deleteBoard(boardId: String): Result<Unit>
 }
