@@ -14,3 +14,6 @@ captures/
 *.class
 .cxx/
 .externalNativeBuild/
+
+# Logs (including JVM HotSpot hs_err_pid / replay_pid dumps, often *.log in project root)
+*.log
