@@ -24,6 +24,10 @@ class TeamsListViewModel @Inject constructor(
     private val teamsRepository: TeamsRepository,
 ) : ViewModel() {
 
+    companion object {
+        const val TEAM_CREATED_EFFECT = "Team created"
+    }
+
     private val _uiState = MutableStateFlow(TeamsListUiState())
     val uiState: StateFlow<TeamsListUiState> = _uiState.asStateFlow()
 
@@ -62,7 +66,7 @@ class TeamsListViewModel @Inject constructor(
             _uiState.update { it.copy(loading = true, error = null) }
             teamsRepository.createTeam(trimmed).fold(
                 onSuccess = {
-                    _effects.tryEmit("Team created")
+                    _effects.tryEmit(TEAM_CREATED_EFFECT)
                     teamsRepository.listTeams().fold(
                         onSuccess = { list ->
                             _uiState.update {

@@ -27,7 +27,7 @@ interface BoardRepository {
         assigneeId: String?,
         projectIds: List<String>?,
         priority: String?,
-        deadlineDueAt: String?,
+        deadline: CardDeadline?,
     ): Result<BoardCard>
 
     suspend fun patchCard(
@@ -37,7 +37,7 @@ interface BoardRepository {
         priority: String?,
         assigneeId: String?,
         projectIds: List<String>?,
-        deadlineDueAt: String?,
+        deadline: CardDeadline?,
     ): Result<BoardCard>
 
     suspend fun moveCard(cardId: String, targetColumnId: String, newOrder: Int): Result<BoardCard>

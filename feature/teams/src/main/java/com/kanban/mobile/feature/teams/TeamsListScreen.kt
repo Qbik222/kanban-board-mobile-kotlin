@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -30,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -49,6 +52,10 @@ fun TeamsListScreen(
     LaunchedEffect(Unit) {
         viewModel.effects.collect { message ->
             snackbarHostState.showSnackbar(message)
+            if (message == TeamsListViewModel.TEAM_CREATED_EFFECT) {
+                createName = ""
+                createOpen = false
+            }
         }
     }
 
@@ -152,15 +159,20 @@ fun TeamsListScreen(
                     label = { Text("Name") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            if (createName.trim().isNotBlank()) {
+                                viewModel.createTeam(createName)
+                            }
+                        },
+                    ),
                 )
             },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        viewModel.createTeam(createName)
-                        createName = ""
-                        createOpen = false
-                    },
+                    onClick = { viewModel.createTeam(createName) },
+                    enabled = createName.trim().isNotBlank(),
                 ) {
                     Text("Create")
                 }

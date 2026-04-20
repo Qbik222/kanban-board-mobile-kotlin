@@ -1,5 +1,6 @@
 package com.kanban.mobile.feature.boards
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,7 +34,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -178,7 +178,9 @@ fun BoardSettingsScreen(
                             onClick = { viewModel.saveBoard() },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = viewModel.can(BoardAdminPermission.BOARD_UPDATE) &&
-                                !state.isSaving,
+                                !state.isSaving &&
+                                state.titleDraft.trim().isNotEmpty() &&
+                                state.hasBoardMetaChanges(),
                         ) {
                             Text(
                                 if (state.isSaving) {
@@ -194,20 +196,36 @@ fun BoardSettingsScreen(
                         Text("Учасники", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
                         if (viewModel.can(BoardAdminPermission.MEMBER_INVITE)) {
-                            Row(
+                            OutlinedTextField(
+                                value = state.inviteSearchQuery,
+                                onValueChange = viewModel::onInviteSearchQueryChange,
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                OutlinedTextField(
-                                    value = state.inviteUserIdDraft,
-                                    onValueChange = viewModel::onInviteUserIdChange,
-                                    modifier = Modifier.weight(1f),
-                                    label = { Text("User ID (UUID)") },
-                                    singleLine = true,
-                                )
-                                OutlinedButton(onClick = { viewModel.inviteMember() }) {
-                                    Text("Запросити")
+                                label = { Text("Пошук учасника команди (email, ім'я, id)") },
+                                singleLine = true,
+                            )
+                            if (state.inviteCandidates.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                state.inviteCandidates.forEach { c ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { viewModel.inviteMember(c.userId) }
+                                            .padding(vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(c.email ?: c.userId)
+                                            Text(
+                                                listOfNotNull(c.name, c.userId).joinToString(" · "),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        OutlinedButton(onClick = { viewModel.inviteMember(c.userId) }) {
+                                            Text("Запросити")
+                                        }
+                                    }
                                 }
                             }
                             Spacer(modifier = Modifier.height(8.dp))

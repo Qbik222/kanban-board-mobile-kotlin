@@ -145,7 +145,9 @@ fun CreateBoardScreen(
 
                     Button(
                         onClick = { viewModel.submit() },
-                        enabled = !state.loadingSubmit && state.selectedTeamId.isNotBlank(),
+                        enabled = !state.loadingSubmit &&
+                            state.selectedTeamId.isNotBlank() &&
+                            state.title.trim().isNotEmpty(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         if (state.loadingSubmit) {

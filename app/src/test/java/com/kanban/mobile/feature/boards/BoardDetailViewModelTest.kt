@@ -74,7 +74,7 @@ class BoardDetailViewModelTest {
                                 CardComment("1", "a", null),
                                 CardComment("2", "b", null),
                             ),
-                            deadlineDueAt = null,
+                            deadline = null,
                         ),
                     ),
                 ),

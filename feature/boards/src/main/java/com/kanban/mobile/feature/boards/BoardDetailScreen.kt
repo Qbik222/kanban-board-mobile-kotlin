@@ -1,5 +1,6 @@
 package com.kanban.mobile.feature.boards
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,17 +23,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
@@ -64,6 +69,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -81,10 +87,12 @@ fun BoardDetailScreen(
     viewModel: BoardDetailViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToAiLab: () -> Unit = {},
     onNavigateToBoards: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var newColumnTitle by rememberSaveable { mutableStateOf("") }
 
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
@@ -96,6 +104,7 @@ fun BoardDetailScreen(
             when (effect) {
                 is BoardDetailEffect.Snackbar -> snackbarHostState.showSnackbar(effect.message)
                 BoardDetailEffect.NavigateToBoards -> onNavigateToBoards()
+                BoardDetailEffect.ColumnCreated -> newColumnTitle = ""
             }
         }
     }
@@ -118,6 +127,9 @@ fun BoardDetailScreen(
                     }
                 },
                 actions = {
+                    TextButton(onClick = onNavigateToAiLab) {
+                        Text("AI")
+                    }
                     TextButton(onClick = onNavigateToSettings) {
                         Text("Settings")
                     }
@@ -158,6 +170,8 @@ fun BoardDetailScreen(
                     BoardKanbanContent(
                         state = state,
                         viewModel = viewModel,
+                        newColumnTitle = newColumnTitle,
+                        onNewColumnTitleChange = { newColumnTitle = it },
                     )
                 }
             }
@@ -211,10 +225,10 @@ private data class BoardCardDragSession(
 private fun BoardKanbanContent(
     state: BoardDetailUiState,
     viewModel: BoardDetailViewModel,
+    newColumnTitle: String,
+    onNewColumnTitleChange: (String) -> Unit,
 ) {
     val board = state.board ?: return
-
-    var newColumnTitle by rememberSaveable { mutableStateOf("") }
     var renameTargetId by remember { mutableStateOf<String?>(null) }
     var renameText by rememberSaveable { mutableStateOf("") }
 
@@ -320,15 +334,20 @@ private fun BoardKanbanContent(
                     OutlinedTextField(
                         modifier = Modifier.weight(1f),
                         value = newColumnTitle,
-                        onValueChange = { newColumnTitle = it },
+                        onValueChange = onNewColumnTitleChange,
                         placeholder = { Text("New column") },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                val t = newColumnTitle.trim()
+                                if (t.isNotEmpty()) viewModel.createColumn(newColumnTitle)
+                            },
+                        ),
                     )
                     OutlinedButton(
-                        onClick = {
-                            viewModel.createColumn(newColumnTitle)
-                            newColumnTitle = ""
-                        },
+                        onClick = { viewModel.createColumn(newColumnTitle) },
+                        enabled = newColumnTitle.trim().isNotEmpty(),
                     ) {
                         Text("Add")
                     }
@@ -356,6 +375,7 @@ private fun BoardKanbanContent(
                         column = column,
                         board = board,
                         viewModel = viewModel,
+                        pendingInlineDraft = state.pendingInlineCard,
                         isDragging = dragSession != null,
                         draggedCardId = dragSession?.card?.id,
                         hoverColumnId = hoverColumnId,
@@ -439,10 +459,65 @@ private fun BoardKanbanContent(
 }
 
 @Composable
+private fun InlineNewCardDraftBlock(
+    draft: InlineNewCardDraft,
+    viewModel: BoardDetailViewModel,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = modifier,
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("Quick edit", style = MaterialTheme.typography.labelSmall)
+            OutlinedTextField(
+                value = draft.title,
+                onValueChange = { v ->
+                    viewModel.updateInlineNewCardDraft { it.copy(title = v) }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Title") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = draft.deadlineStart,
+                onValueChange = { v ->
+                    viewModel.updateInlineNewCardDraft { it.copy(deadlineStart = v) }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Start date (ISO)") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = draft.deadlineEnd,
+                onValueChange = { v ->
+                    viewModel.updateInlineNewCardDraft { it.copy(deadlineEnd = v) }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("End date (ISO)") },
+                singleLine = true,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { viewModel.submitInlineNewCard() }) {
+                    Text("Save")
+                }
+                OutlinedButton(onClick = { viewModel.cancelInlineNewCard() }) {
+                    Text("Cancel")
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun KanbanColumnCard(
     column: BoardColumn,
     board: BoardDetails,
     viewModel: BoardDetailViewModel,
+    pendingInlineDraft: InlineNewCardDraft?,
     isDragging: Boolean,
     draggedCardId: String?,
     hoverColumnId: String?,
@@ -542,6 +617,7 @@ private fun KanbanColumnCard(
                 if (viewModel.can(BoardPermission.CREATE_CARD)) {
                     OutlinedButton(
                         onClick = { viewModel.createCard(column.id) },
+                        enabled = pendingInlineDraft == null,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text("+ Card")
@@ -554,20 +630,28 @@ private fun KanbanColumnCard(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     itemsIndexed(column.cards, key = { _, c -> c.id }) { indexInColumn, card ->
-                        KanbanCardRow(
-                            card = card,
-                            columnId = column.id,
-                            sourceIndex = indexInColumn,
-                            viewModel = viewModel,
-                            isDraggedCard = draggedCardId == card.id,
-                            onOpen = { viewModel.selectCard(card.id) },
-                            onRegisterCardBounds = { rect ->
-                                onRegisterCardBounds(column.id, card.id, rect)
-                            },
-                            onStartDrag = onStartDrag,
-                            onDragMove = onDragMove,
-                            onDragEnd = onDragEnd,
-                        )
+                        if (pendingInlineDraft?.cardId == card.id) {
+                            InlineNewCardDraftBlock(
+                                draft = pendingInlineDraft,
+                                viewModel = viewModel,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        } else {
+                            KanbanCardRow(
+                                card = card,
+                                columnId = column.id,
+                                sourceIndex = indexInColumn,
+                                viewModel = viewModel,
+                                isDraggedCard = draggedCardId == card.id,
+                                onOpen = { viewModel.selectCard(card.id) },
+                                onRegisterCardBounds = { rect ->
+                                    onRegisterCardBounds(column.id, card.id, rect)
+                                },
+                                onStartDrag = onStartDrag,
+                                onDragMove = onDragMove,
+                                onDragEnd = onDragEnd,
+                            )
+                        }
                     }
                 }
             }
@@ -724,14 +808,24 @@ private fun CardDetailSheet(
             minLines = 3,
         )
         Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = draft.priority,
-            onValueChange = { onDraftChange(draft.copy(priority = it)) },
-            enabled = canEdit,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Priority") },
-            singleLine = true,
-        )
+        Text("Priority", style = MaterialTheme.typography.labelLarge)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            CardPriorityOptions.LABELS.forEach { (value, label) ->
+                FilterChip(
+                    selected = draft.priority == value,
+                    onClick = {
+                        if (canEdit) onDraftChange(draft.copy(priority = value))
+                    },
+                    enabled = canEdit,
+                    label = { Text(label) },
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = draft.assigneeId,
@@ -752,11 +846,20 @@ private fun CardDetailSheet(
         )
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
-            value = draft.deadlineDueAt,
-            onValueChange = { onDraftChange(draft.copy(deadlineDueAt = it)) },
+            value = draft.deadlineStart,
+            onValueChange = { onDraftChange(draft.copy(deadlineStart = it)) },
             enabled = canEdit,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Deadline (ISO)") },
+            label = { Text("Start date (ISO)") },
+            singleLine = true,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = draft.deadlineEnd,
+            onValueChange = { onDraftChange(draft.copy(deadlineEnd = it)) },
+            enabled = canEdit,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("End date (ISO)") },
             singleLine = true,
         )
 

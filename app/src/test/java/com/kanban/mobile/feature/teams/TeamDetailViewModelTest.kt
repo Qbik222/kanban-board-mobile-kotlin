@@ -80,6 +80,32 @@ class TeamDetailViewModelTest {
         coVerify(exactly = 1) { repo.inviteSearch("t1", "joe", 20) }
     }
 
+    @Test
+    fun inviteSearch_singleCharacter_callsApiAndAppliesPrefixFilter() = runTest(dispatcher) {
+        val repo = mockk<TeamsRepository>()
+        coEvery { repo.getTeam("t1") } returns Result.success(Team("t1", "N"))
+        coEvery { repo.listMembers("t1") } returns Result.success(emptyList())
+        coEvery { repo.inviteSearch("t1", "y", 20) } returns Result.success(
+            listOf(
+                InviteCandidate("good", "yo@test.com", "Yo"),
+                InviteCandidate("bad", "zoe@test.com", "Zoe"),
+            ),
+        )
+        val session = mockSession()
+        val vm = TeamDetailViewModel(
+            SavedStateHandle(mapOf("teamId" to "t1")),
+            repo,
+            session,
+        )
+        advanceUntilIdle()
+        vm.onInviteSearchQueryChange("y")
+        advanceTimeBy(450)
+        advanceUntilIdle()
+        coVerify(exactly = 1) { repo.inviteSearch("t1", "y", 20) }
+        assertEquals(1, vm.uiState.value.inviteCandidates.size)
+        assertEquals("good", vm.uiState.value.inviteCandidates.first().userId)
+    }
+
     private fun mockSession(): SessionRepository {
         val session = mockk<SessionRepository>()
         every { session.sessionState } returns MutableStateFlow(

@@ -56,6 +56,24 @@ data class CardComment(
     val userId: String?,
 )
 
+/** Aligns with [com.kanban.mobile.core.network.dto.CardDeadlineDto] (ISO date strings). */
+data class CardDeadline(
+    val startDate: String? = null,
+    val endDate: String? = null,
+    val dueAt: String? = null,
+)
+
+/** Fixed set for dropdown parity with the web client (extend if backend adds values). */
+object CardPriorityOptions {
+    val LABELS = listOf(
+        "" to "(none)",
+        "LOW" to "Low",
+        "MEDIUM" to "Medium",
+        "HIGH" to "High",
+        "URGENT" to "Urgent",
+    )
+}
+
 data class BoardCard(
     val id: String,
     val title: String,
@@ -66,7 +84,7 @@ data class BoardCard(
     val assigneeId: String?,
     val projectIds: List<String>,
     val comments: List<CardComment>,
-    val deadlineDueAt: String?,
+    val deadline: CardDeadline?,
 ) {
     val commentCount: Int get() = comments.size
 }

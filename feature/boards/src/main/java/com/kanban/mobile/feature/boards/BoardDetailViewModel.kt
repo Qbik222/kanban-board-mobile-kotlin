@@ -32,7 +32,17 @@ data class CardDraft(
     val priority: String,
     val assigneeId: String,
     val projectIdsText: String,
-    val deadlineDueAt: String,
+    val deadlineStart: String,
+    val deadlineEnd: String,
+)
+
+/** Quick-edit draft for a card just created on the board (lifted to ViewModel). */
+data class InlineNewCardDraft(
+    val columnId: String,
+    val cardId: String,
+    val title: String,
+    val deadlineStart: String,
+    val deadlineEnd: String,
 )
 
 data class BoardDetailUiState(
@@ -43,6 +53,7 @@ data class BoardDetailUiState(
     val selectedCardId: String? = null,
     val cardDraft: CardDraft? = null,
     val newCommentText: String = "",
+    val pendingInlineCard: InlineNewCardDraft? = null,
 )
 
 @HiltViewModel
@@ -85,11 +96,42 @@ class BoardDetailViewModel @Inject constructor(
 
     fun selectCard(cardId: String?) {
         val board = _uiState.value.board
-        _uiState.update { st ->
-            val draft = cardId?.let { id ->
-                board?.findCard(id)?.toDraft()
+        val pending = _uiState.value.pendingInlineCard
+
+        var nextBoard = board
+        var nextPending = pending
+
+        if (pending != null) {
+            when {
+                cardId == pending.cardId -> {
+                    nextPending = null
+                }
+                cardId == null -> {
+                    nextPending = pending
+                }
+                else -> {
+                    viewModelScope.launch {
+                        boardRepository.deleteCard(pending.cardId).onFailure { e ->
+                            _effects.tryEmit(BoardDetailEffect.Snackbar(e.message ?: "Delete failed"))
+                        }
+                    }
+                    nextBoard = nextBoard?.let { KanbanBoardReducer.removeCard(it, pending.cardId) }
+                    nextPending = null
+                }
             }
-            st.copy(selectedCardId = cardId, cardDraft = draft, newCommentText = "")
+        }
+
+        val draft = cardId?.let { id ->
+            nextBoard?.findCard(id)?.toDraft()
+        }
+        _uiState.update { st ->
+            st.copy(
+                board = nextBoard ?: st.board,
+                selectedCardId = cardId,
+                cardDraft = draft,
+                newCommentText = "",
+                pendingInlineCard = nextPending,
+            )
         }
     }
 
@@ -103,6 +145,85 @@ class BoardDetailViewModel @Inject constructor(
 
     fun updateNewCommentText(text: String) {
         _uiState.update { it.copy(newCommentText = text) }
+    }
+
+    fun updateInlineNewCardDraft(transform: (InlineNewCardDraft) -> InlineNewCardDraft) {
+        _uiState.update { st ->
+            val d = st.pendingInlineCard ?: return@update st
+            st.copy(pendingInlineCard = transform(d))
+        }
+    }
+
+    fun submitInlineNewCard() {
+        val d = _uiState.value.pendingInlineCard ?: return
+        if (!can(BoardPermission.UPDATE_CARD)) {
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to edit cards"))
+            return
+        }
+        if (d.title.trim().isEmpty()) {
+            _effects.tryEmit(BoardDetailEffect.Snackbar("Title is required"))
+            return
+        }
+        viewModelScope.launch {
+            val ds = d.deadlineStart.trim().takeIf { it.isNotEmpty() }
+            val de = d.deadlineEnd.trim().takeIf { it.isNotEmpty() }
+            val deadline =
+                if (ds != null || de != null) {
+                    CardDeadline(startDate = ds, endDate = de, dueAt = null)
+                } else {
+                    null
+                }
+            boardRepository.patchCard(
+                cardId = d.cardId,
+                title = d.title.trim(),
+                description = null,
+                priority = null,
+                assigneeId = null,
+                projectIds = null,
+                deadline = deadline,
+            ).fold(
+                onSuccess = { updated ->
+                    _uiState.update { st ->
+                        val b = st.board ?: return@update st
+                        st.copy(
+                            board = KanbanBoardReducer.patchCard(b, updated),
+                            pendingInlineCard = null,
+                        )
+                    }
+                    _effects.tryEmit(BoardDetailEffect.Snackbar("Saved"))
+                },
+                onFailure = { e ->
+                    _effects.tryEmit(BoardDetailEffect.Snackbar(e.message ?: "Save failed"))
+                },
+            )
+        }
+    }
+
+    fun cancelInlineNewCard() {
+        val d = _uiState.value.pendingInlineCard ?: return
+        if (!can(BoardPermission.DELETE_CARD)) {
+            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to delete cards"))
+            return
+        }
+        viewModelScope.launch {
+            val snapshot = _uiState.value.board
+            _uiState.update { st ->
+                val b = st.board ?: return@update st
+                st.copy(
+                    board = KanbanBoardReducer.removeCard(b, d.cardId),
+                    pendingInlineCard = null,
+                )
+            }
+            boardRepository.deleteCard(d.cardId).fold(
+                onSuccess = { },
+                onFailure = { e ->
+                    _uiState.update {
+                        it.copy(board = snapshot, pendingInlineCard = d)
+                    }
+                    _effects.tryEmit(BoardDetailEffect.Snackbar(e.message ?: "Delete failed"))
+                },
+            )
+        }
     }
 
     fun can(permission: BoardPermission): Boolean =
@@ -129,7 +250,14 @@ class BoardDetailViewModel @Inject constructor(
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .takeIf { it.isNotEmpty() }
-            val deadline = draft.deadlineDueAt.trim().takeIf { it.isNotEmpty() }
+            val ds = draft.deadlineStart.trim().takeIf { it.isNotEmpty() }
+            val de = draft.deadlineEnd.trim().takeIf { it.isNotEmpty() }
+            val deadline =
+                if (ds != null || de != null) {
+                    CardDeadline(startDate = ds, endDate = de, dueAt = null)
+                } else {
+                    null
+                }
             val assignee = draft.assigneeId.trim().takeIf { it.isNotEmpty() }
             val priority = draft.priority.trim().takeIf { it.isNotEmpty() }
             boardRepository.patchCard(
@@ -139,7 +267,7 @@ class BoardDetailViewModel @Inject constructor(
                 priority = priority,
                 assigneeId = assignee,
                 projectIds = projectIds,
-                deadlineDueAt = deadline,
+                deadline = deadline,
             ).fold(
                 onSuccess = { updated ->
                     _uiState.update { st ->
@@ -190,12 +318,21 @@ class BoardDetailViewModel @Inject constructor(
                 assigneeId = null,
                 projectIds = null,
                 priority = null,
-                deadlineDueAt = null,
+                deadline = null,
             ).fold(
                 onSuccess = { card ->
                     _uiState.update { st ->
                         val b = st.board ?: return@update st
-                        st.copy(board = KanbanBoardReducer.addCard(b, card))
+                        st.copy(
+                            board = KanbanBoardReducer.addCard(b, card),
+                            pendingInlineCard = InlineNewCardDraft(
+                                columnId = columnId,
+                                cardId = card.id,
+                                title = card.title,
+                                deadlineStart = "",
+                                deadlineEnd = "",
+                            ),
+                        )
                     }
                 },
                 onFailure = { _effects.tryEmit(BoardDetailEffect.Snackbar(it.message ?: "Create failed")) },
@@ -217,6 +354,7 @@ class BoardDetailViewModel @Inject constructor(
                         val b = st.board ?: return@update st
                         st.copy(board = KanbanBoardReducer.upsertColumn(b, col))
                     }
+                    _effects.tryEmit(BoardDetailEffect.ColumnCreated)
                 },
                 onFailure = { _effects.tryEmit(BoardDetailEffect.Snackbar(it.message ?: "Column create failed")) },
             )
@@ -497,6 +635,7 @@ class BoardDetailViewModel @Inject constructor(
             priority = priority.orEmpty(),
             assigneeId = assigneeId.orEmpty(),
             projectIdsText = projectIds.joinToString(","),
-            deadlineDueAt = deadlineDueAt.orEmpty(),
+            deadlineStart = deadline?.startDate.orEmpty(),
+            deadlineEnd = (deadline?.endDate ?: deadline?.dueAt).orEmpty(),
         )
 }

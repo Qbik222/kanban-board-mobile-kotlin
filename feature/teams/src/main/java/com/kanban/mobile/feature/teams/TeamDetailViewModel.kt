@@ -25,6 +25,8 @@ import kotlinx.coroutines.launch
 data class TeamDetailUiState(
     val loading: Boolean = true,
     val team: Team? = null,
+    /** Name from server when [team] was loaded; rename save only if the trimmed draft differs. */
+    val loadedTeamName: String = "",
     val members: List<TeamMember> = emptyList(),
     val screenError: String? = null,
     val inviteSearchQuery: String = "",
@@ -58,11 +60,11 @@ class TeamDetailViewModel @Inject constructor(
                 .distinctUntilChanged()
                 .flatMapLatest { q ->
                     flow {
-                        if (q.length < 2) {
+                        if (q.trim().isEmpty()) {
                             emit(emptyList())
                         } else {
                             val r = teamsRepository.inviteSearch(teamId, q, limit = 20)
-                            emit(r.getOrElse { emptyList() })
+                            emit(r.getOrElse { emptyList() }.filterByInvitePrefix(q))
                         }
                     }
                 }
@@ -115,6 +117,7 @@ class TeamDetailViewModel @Inject constructor(
                 it.copy(
                     loading = false,
                     team = team,
+                    loadedTeamName = team?.name.orEmpty(),
                     members = members ?: emptyList(),
                     screenError = err,
                 )
@@ -128,11 +131,16 @@ class TeamDetailViewModel @Inject constructor(
             _effects.tryEmit("Enter a name")
             return
         }
+        if (trimmed == _uiState.value.loadedTeamName.trim()) {
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(pendingMutation = true) }
             teamsRepository.patchTeam(teamId, trimmed).fold(
                 onSuccess = { team ->
-                    _uiState.update { it.copy(team = team, pendingMutation = false) }
+                    _uiState.update {
+                        it.copy(team = team, loadedTeamName = team.name, pendingMutation = false)
+                    }
                     _effects.tryEmit("Team updated")
                 },
                 onFailure = { e ->
@@ -144,7 +152,15 @@ class TeamDetailViewModel @Inject constructor(
     }
 
     fun addMember() {
-        val raw = _uiState.value.addMemberUserId.trim()
+        inviteUserById(_uiState.value.addMemberUserId.trim())
+    }
+
+    /** Invite a user chosen from debounced search (same API as manual user id entry). */
+    fun inviteCandidateUser(userId: String) {
+        inviteUserById(userId.trim())
+    }
+
+    private fun inviteUserById(raw: String) {
         if (raw.isBlank()) {
             _effects.tryEmit("Enter user id")
             return
@@ -154,7 +170,15 @@ class TeamDetailViewModel @Inject constructor(
             teamsRepository.addMember(teamId, raw, role = TeamMemberRole.MEMBER).fold(
                 onSuccess = {
                     _effects.tryEmit("Member added")
-                    _uiState.update { it.copy(addMemberUserId = "", pendingMutation = false) }
+                    _uiState.update {
+                        it.copy(
+                            addMemberUserId = "",
+                            inviteSearchQuery = "",
+                            inviteCandidates = emptyList(),
+                            pendingMutation = false,
+                        )
+                    }
+                    inviteSearchInput.value = ""
                     reloadMembers()
                 },
                 onFailure = { e ->

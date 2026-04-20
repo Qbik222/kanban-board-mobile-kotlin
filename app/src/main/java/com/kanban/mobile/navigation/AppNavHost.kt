@@ -20,6 +20,7 @@ import com.kanban.mobile.feature.auth.RegisterViewModel
 import com.kanban.mobile.feature.auth.SplashDestination
 import com.kanban.mobile.feature.auth.SplashScreen
 import com.kanban.mobile.feature.auth.SplashViewModel
+import com.kanban.mobile.feature.boards.AiPlaygroundScreen
 import com.kanban.mobile.feature.boards.BoardDetailScreen
 import com.kanban.mobile.feature.boards.BoardSettingsScreen
 import com.kanban.mobile.feature.boards.BoardsListScreen
@@ -181,11 +182,24 @@ private fun KanbanNavHost(
                 onNavigateToSettings = {
                     navController.navigate(AppRoutes.boardSettings(boardId))
                 },
+                onNavigateToAiLab = {
+                    navController.navigate(AppRoutes.boardAiLab(boardId))
+                },
                 onNavigateToBoards = {
                     navController.navigate(AppRoutes.Boards) {
                         popUpTo(AppRoutes.Boards) { inclusive = true }
                     }
                 },
+            )
+        }
+        composable(
+            route = AppRoutes.BoardAiLab,
+            arguments = listOf(
+                navArgument("boardId") { type = NavType.StringType },
+            ),
+        ) {
+            AiPlaygroundScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
         composable(
@@ -215,6 +229,9 @@ private fun KanbanNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToSettings = {
                     navController.navigate(AppRoutes.boardSettings(boardId))
+                },
+                onNavigateToAiLab = {
+                    navController.navigate(AppRoutes.boardAiLab(boardId))
                 },
                 onNavigateToBoards = {
                     navController.navigate(AppRoutes.Boards) {

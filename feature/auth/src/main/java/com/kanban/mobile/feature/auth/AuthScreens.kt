@@ -80,7 +80,9 @@ fun LoginScreen(
             }
             Button(
                 onClick = { viewModel.login(onAuthenticated) },
-                enabled = !state.loading,
+                enabled = !state.loading &&
+                    state.email.trim().isNotBlank() &&
+                    state.password.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (state.loading) {
@@ -117,7 +119,7 @@ fun RegisterScreen(
                 value = state.name,
                 onValueChange = viewModel::onNameChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Name (optional)") },
+                label = { Text("Name") },
                 singleLine = true,
             )
             OutlinedTextField(
@@ -139,7 +141,10 @@ fun RegisterScreen(
             }
             Button(
                 onClick = { viewModel.register(onRegistered) },
-                enabled = !state.loading,
+                enabled = !state.loading &&
+                    state.email.trim().isNotBlank() &&
+                    state.password.isNotBlank() &&
+                    state.name.trim().length >= 2,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (state.loading) {

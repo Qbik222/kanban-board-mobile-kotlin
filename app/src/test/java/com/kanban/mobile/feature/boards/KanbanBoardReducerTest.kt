@@ -44,7 +44,7 @@ class KanbanBoardReducerTest {
             assigneeId = null,
             projectIds = emptyList(),
             comments = emptyList(),
-            deadlineDueAt = null,
+            deadline = null,
         )
 
     @Test

@@ -27,6 +27,7 @@ import com.kanban.mobile.feature.boards.BoardRepository
 import com.kanban.mobile.feature.boards.BoardRole
 import com.kanban.mobile.feature.boards.BoardSummary
 import com.kanban.mobile.feature.boards.CardComment
+import com.kanban.mobile.feature.boards.CardDeadline
 import com.kanban.mobile.feature.boards.toBoardCard
 import com.kanban.mobile.feature.boards.toBoardColumn
 import com.kanban.mobile.feature.boards.toDomain
@@ -114,7 +115,7 @@ class DefaultBoardRepository @Inject constructor(
         assigneeId: String?,
         projectIds: List<String>?,
         priority: String?,
-        deadlineDueAt: String?,
+        deadline: CardDeadline?,
     ): Result<BoardCard> = withContext(Dispatchers.IO) {
         runCatching {
             boardApi.createCard(
@@ -125,7 +126,7 @@ class DefaultBoardRepository @Inject constructor(
                     assigneeId = assigneeId,
                     projectIds = projectIds?.takeIf { it.isNotEmpty() },
                     priority = priority,
-                    deadline = deadlineDueAt?.let { CardDeadlineDto(endDate = it) },
+                    deadline = deadline.toDto(),
                 ),
             ).toBoardCard()
         }
@@ -138,7 +139,7 @@ class DefaultBoardRepository @Inject constructor(
         priority: String?,
         assigneeId: String?,
         projectIds: List<String>?,
-        deadlineDueAt: String?,
+        deadline: CardDeadline?,
     ): Result<BoardCard> = withContext(Dispatchers.IO) {
         runCatching {
             boardApi.patchCard(
@@ -149,7 +150,7 @@ class DefaultBoardRepository @Inject constructor(
                     priority = priority,
                     assigneeId = assigneeId,
                     projectIds = projectIds,
-                    deadline = deadlineDueAt?.let { CardDeadlineDto(endDate = it) },
+                    deadline = deadline.toDto(),
                 ),
             ).toBoardCard()
         }
@@ -253,6 +254,15 @@ class DefaultBoardRepository @Inject constructor(
                 Unit
             }
         }
+
+    private fun CardDeadline?.toDto(): CardDeadlineDto? {
+        val d = this ?: return null
+        val start = d.startDate?.takeIf { it.isNotBlank() }
+        val end = d.endDate?.takeIf { it.isNotBlank() }
+        val due = d.dueAt?.takeIf { it.isNotBlank() }
+        if (start == null && end == null && due == null) return null
+        return CardDeadlineDto(startDate = start, endDate = end, dueAt = due)
+    }
 
     private suspend fun refreshMembersCache(boardId: String) {
         val members = boardApi.getBoardMembers(boardId).map { it.toMember() }

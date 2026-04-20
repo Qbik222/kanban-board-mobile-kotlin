@@ -24,6 +24,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kanban.mobile.feature.teams.Team
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -46,6 +48,7 @@ fun BoardsListScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val visibleBoards = state.visibleBoards
     val refreshing = state.loading && state.boards.isNotEmpty()
     val pullRefreshState = rememberPullRefreshState(
         refreshing = refreshing,
@@ -113,7 +116,38 @@ fun BoardsListScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        items(state.boards, key = { it.id }) { board ->
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                FilterChip(
+                                    selected = state.filterTeamId == null,
+                                    onClick = { viewModel.setFilterTeamId(null) },
+                                    label = { Text("All teams") },
+                                )
+                                state.teams.forEach { team ->
+                                    FilterChip(
+                                        selected = state.filterTeamId == team.id,
+                                        onClick = { viewModel.setFilterTeamId(team.id) },
+                                        label = { Text(team.name) },
+                                    )
+                                }
+                            }
+                        }
+                        if (visibleBoards.isEmpty()) {
+                            item {
+                                Text(
+                                    text = "No boards match this filter.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                )
+                            }
+                        }
+                        items(visibleBoards, key = { it.id }) { board ->
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -130,7 +164,7 @@ fun BoardsListScreen(
                                         style = MaterialTheme.typography.titleMedium,
                                     )
                                     Text(
-                                        text = "Team: ${board.teamId}",
+                                        text = teamLabel(board.teamId, state.teams),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -164,5 +198,14 @@ fun BoardsListScreen(
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
+    }
+}
+
+private fun teamLabel(teamId: String, teams: List<Team>): String {
+    val name = teams.firstOrNull { it.id == teamId }?.name
+    return if (name != null) {
+        "Team: $name"
+    } else {
+        "Team: $teamId"
     }
 }

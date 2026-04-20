@@ -9,6 +9,8 @@ import com.kanban.mobile.core.session.SessionState
 import com.kanban.mobile.feature.boards.permissions.BoardAdminPermission
 import com.kanban.mobile.feature.boards.permissions.resolveEffectiveBoardRole
 import com.kanban.mobile.feature.boards.permissions.roleHasAdminPermission
+import com.kanban.mobile.feature.teams.InviteCandidate
+import com.kanban.mobile.feature.teams.filterByInvitePrefix
 import com.kanban.mobile.feature.teams.TeamMemberRole
 import com.kanban.mobile.feature.teams.TeamsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,16 +21,25 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class BoardSettingsUiState(
     val loading: Boolean = true,
+    /** Server title when settings were loaded (rename save only if [titleDraft] differs when trimmed). */
+    val loadedTitle: String = "",
+    val loadedProjectIds: List<String> = emptyList(),
     val titleDraft: String = "",
     val projectIds: List<String> = emptyList(),
     val newProjectIdInput: String = "",
-    val inviteUserIdDraft: String = "",
+    val teamId: String = "",
+    val inviteSearchQuery: String = "",
+    val inviteCandidates: List<InviteCandidate> = emptyList(),
     val members: List<BoardMember> = emptyList(),
     val ownerId: String = "",
     val effectiveRole: BoardRole = BoardRole.VIEWER,
@@ -36,13 +47,17 @@ data class BoardSettingsUiState(
     val isSaving: Boolean = false,
     val isDeleting: Boolean = false,
     val memberActionInProgressUserId: String? = null,
-)
+) {
+    fun hasBoardMetaChanges(): Boolean =
+        titleDraft.trim() != loadedTitle.trim() || projectIds != loadedProjectIds
+}
 
 sealed interface BoardSettingsUiEffect {
     data class Snackbar(val message: String) : BoardSettingsUiEffect
     data object NavigateToBoardsAfterDelete : BoardSettingsUiEffect
 }
 
+@OptIn(kotlinx.coroutines.FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class BoardSettingsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -59,7 +74,28 @@ class BoardSettingsViewModel @Inject constructor(
     private val _effects = MutableSharedFlow<BoardSettingsUiEffect>(extraBufferCapacity = 8)
     val effects: SharedFlow<BoardSettingsUiEffect> = _effects.asSharedFlow()
 
+    private val inviteSearchInput = MutableStateFlow("")
+
     init {
+        viewModelScope.launch {
+            inviteSearchInput
+                .debounce(400L)
+                .distinctUntilChanged()
+                .flatMapLatest { q ->
+                    flow {
+                        val teamId = _uiState.value.teamId
+                        if (teamId.isBlank() || q.trim().isEmpty()) {
+                            emit(emptyList())
+                        } else {
+                            val r = teamsRepository.inviteSearch(teamId, q, limit = 20)
+                            emit(r.getOrElse { emptyList() }.filterByInvitePrefix(q))
+                        }
+                    }
+                }
+                .collect { candidates ->
+                    _uiState.update { it.copy(inviteCandidates = candidates) }
+                }
+        }
         reload()
     }
 
@@ -78,8 +114,11 @@ class BoardSettingsViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             loading = false,
+                            loadedTitle = board.title,
+                            loadedProjectIds = board.projectIds.toList(),
                             titleDraft = board.title,
-                            projectIds = board.projectIds,
+                            projectIds = board.projectIds.toList(),
+                            teamId = board.teamId,
                             members = board.members,
                             ownerId = board.ownerId,
                             effectiveRole = role,
@@ -127,8 +166,9 @@ class BoardSettingsViewModel @Inject constructor(
         }
     }
 
-    fun onInviteUserIdChange(value: String) {
-        _uiState.update { it.copy(inviteUserIdDraft = value) }
+    fun onInviteSearchQueryChange(query: String) {
+        _uiState.update { it.copy(inviteSearchQuery = query) }
+        inviteSearchInput.value = query
     }
 
     fun saveBoard() {
@@ -141,12 +181,21 @@ class BoardSettingsViewModel @Inject constructor(
             _effects.tryEmit(BoardSettingsUiEffect.Snackbar("Введіть назву дошки"))
             return
         }
+        if (!_uiState.value.hasBoardMetaChanges()) {
+            return
+        }
         if (_uiState.value.isSaving) return
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             boardRepository.updateBoard(boardId, title, _uiState.value.projectIds).fold(
                 onSuccess = {
-                    _uiState.update { it.copy(isSaving = false) }
+                    _uiState.update { st ->
+                        st.copy(
+                            isSaving = false,
+                            loadedTitle = title,
+                            loadedProjectIds = st.projectIds.toList(),
+                        )
+                    }
                     _effects.tryEmit(BoardSettingsUiEffect.Snackbar("Збережено"))
                 },
                 onFailure = { e ->
@@ -157,20 +206,21 @@ class BoardSettingsViewModel @Inject constructor(
         }
     }
 
-    fun inviteMember() {
+    fun inviteMember(userId: String) {
         if (!can(BoardAdminPermission.MEMBER_INVITE)) {
             _effects.tryEmit(BoardSettingsUiEffect.Snackbar("Немає прав"))
             return
         }
-        val uid = _uiState.value.inviteUserIdDraft.trim()
+        val uid = userId.trim()
         if (uid.isEmpty()) {
-            _effects.tryEmit(BoardSettingsUiEffect.Snackbar("Введіть user id"))
+            _effects.tryEmit(BoardSettingsUiEffect.Snackbar("Оберіть користувача"))
             return
         }
         viewModelScope.launch {
             boardRepository.inviteBoardMember(boardId, uid).fold(
                 onSuccess = {
-                    _uiState.update { it.copy(inviteUserIdDraft = "") }
+                    _uiState.update { it.copy(inviteSearchQuery = "", inviteCandidates = emptyList()) }
+                    inviteSearchInput.value = ""
                     refreshMembersOnly()
                     _effects.tryEmit(BoardSettingsUiEffect.Snackbar("Запрошено"))
                 },

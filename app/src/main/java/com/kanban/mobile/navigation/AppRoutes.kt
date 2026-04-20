@@ -12,6 +12,7 @@ object AppRoutes {
     const val BoardDetail = "boards/{boardId}"
     const val BoardSettings = "boards/{boardId}/settings"
     const val BoardCardDetail = "boards/{boardId}/cards/{cardId}"
+    const val BoardAiLab = "boards/{boardId}/ai-lab"
     const val BoardCreate = "boards/create?teamId={teamId}"
 
     fun teamDetail(teamId: String): String = "teams/$teamId"
@@ -21,6 +22,8 @@ object AppRoutes {
     fun boardSettings(boardId: String): String = "boards/$boardId/settings"
 
     fun boardCardDetail(boardId: String, cardId: String): String = "boards/$boardId/cards/$cardId"
+
+    fun boardAiLab(boardId: String): String = "boards/$boardId/ai-lab"
 
     fun boardCreate(teamId: String = ""): String =
         if (teamId.isEmpty()) {

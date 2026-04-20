@@ -1,5 +1,6 @@
 package com.kanban.mobile.feature.teams
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -126,7 +126,7 @@ fun TeamDetailScreen(
                             value = state.inviteSearchQuery,
                             onValueChange = { viewModel.onInviteSearchQueryChange(it) },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Search users (min 2 characters)") },
+                            label = { Text("Search users (name, email, id)") },
                             singleLine = true,
                             enabled = !state.pendingMutation,
                         )
@@ -136,7 +136,10 @@ fun TeamDetailScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 6.dp),
+                                        .clickable(enabled = !state.pendingMutation) {
+                                            viewModel.inviteCandidateUser(c.userId)
+                                        }
+                                        .padding(vertical = 10.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
@@ -149,40 +152,12 @@ fun TeamDetailScreen(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    TextButton(
-                                        onClick = {
-                                            viewModel.applyCandidateUserId(c)
-                                            viewModel.addMember()
-                                        },
-                                        enabled = !state.pendingMutation,
-                                    ) {
-                                        Text("Add")
-                                    }
+                                    Text(
+                                        text = "Invite",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
                                 }
-                            }
-                        }
-                    }
-
-                    item {
-                        Text("Add member by user id", style = MaterialTheme.typography.titleMedium)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            OutlinedTextField(
-                                value = state.addMemberUserId,
-                                onValueChange = { viewModel.onAddMemberUserIdChange(it) },
-                                modifier = Modifier.weight(1f),
-                                label = { Text("User id (UUID)") },
-                                singleLine = true,
-                                enabled = !state.pendingMutation,
-                            )
-                            Button(
-                                onClick = { viewModel.addMember() },
-                                enabled = !state.pendingMutation,
-                            ) {
-                                Text("Add")
                             }
                         }
                     }
@@ -224,6 +199,9 @@ fun TeamDetailScreen(
                         viewModel.patchTeamName(renameText)
                         renameOpen = false
                     },
+                    enabled = renameText.trim().isNotBlank() &&
+                        renameText.trim() != state.loadedTeamName.trim() &&
+                        !state.pendingMutation,
                 ) {
                     Text("Save")
                 }

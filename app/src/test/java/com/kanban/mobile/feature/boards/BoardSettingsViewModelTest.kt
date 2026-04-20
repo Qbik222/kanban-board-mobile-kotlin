@@ -77,7 +77,9 @@ class BoardSettingsViewModelTest {
 
         val st = vm.uiState.value
         assertEquals("My board", st.titleDraft)
+        assertEquals("My board", st.loadedTitle)
         assertEquals(listOf("proj-a"), st.projectIds)
+        assertEquals(st.projectIds, st.loadedProjectIds)
         assertEquals(1, st.members.size)
         assertEquals(BoardRole.OWNER, st.effectiveRole)
         assertFalse(st.loading)
@@ -136,6 +138,7 @@ class BoardSettingsViewModelTest {
         advanceUntilIdle()
 
         vm.effects.test {
+            vm.onTitleChange("Renamed fails")
             vm.saveBoard()
             advanceUntilIdle()
             val item = awaitItem()
