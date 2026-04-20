@@ -11,4 +11,40 @@ interface BoardRepository {
         teamId: String,
         projectIds: List<String>?,
     ): Result<BoardSummary>
+
+    suspend fun createColumn(boardId: String, title: String): Result<BoardColumn>
+
+    suspend fun reorderColumns(columnOrders: List<Pair<String, Int>>): Result<Unit>
+
+    suspend fun renameColumn(columnId: String, title: String): Result<Unit>
+
+    suspend fun deleteColumn(columnId: String): Result<Unit>
+
+    suspend fun createCard(
+        title: String,
+        description: String?,
+        columnId: String,
+        assigneeId: String?,
+        projectIds: List<String>?,
+        priority: String?,
+        deadlineDueAt: String?,
+    ): Result<BoardCard>
+
+    suspend fun patchCard(
+        cardId: String,
+        title: String?,
+        description: String?,
+        priority: String?,
+        assigneeId: String?,
+        projectIds: List<String>?,
+        deadlineDueAt: String?,
+    ): Result<BoardCard>
+
+    suspend fun moveCard(cardId: String, targetColumnId: String, newOrder: Int): Result<BoardCard>
+
+    suspend fun deleteCard(cardId: String): Result<Unit>
+
+    suspend fun addComment(cardId: String, text: String): Result<CardComment>
+
+    suspend fun deleteComment(cardId: String, commentId: String): Result<Unit>
 }

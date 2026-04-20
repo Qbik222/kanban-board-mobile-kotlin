@@ -178,5 +178,16 @@ private fun KanbanNavHost(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
+        composable(
+            route = AppRoutes.BoardCardDetail,
+            arguments = listOf(
+                navArgument("boardId") { type = NavType.StringType },
+                navArgument("cardId") { type = NavType.StringType },
+            ),
+        ) {
+            BoardDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
     }
 }

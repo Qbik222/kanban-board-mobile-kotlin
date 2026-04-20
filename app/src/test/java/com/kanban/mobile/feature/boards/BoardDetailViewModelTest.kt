@@ -1,10 +1,15 @@
 package com.kanban.mobile.feature.boards
 
 import androidx.lifecycle.SavedStateHandle
+import com.kanban.mobile.core.session.SessionRepository
+import com.kanban.mobile.core.session.SessionState
+import com.kanban.mobile.feature.teams.TeamsRepository
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -36,23 +41,34 @@ class BoardDetailViewModelTest {
     @Test
     fun loadSuccess_showsColumnsAndCards() = runTest(dispatcher) {
         val repo = mockk<BoardRepository>()
+        val sessionRepository = mockk<SessionRepository>()
+        val teamsRepository = mockk<TeamsRepository>()
         val details = BoardDetails(
             id = "b1",
             title = "Board",
             teamId = "t1",
             ownerId = "o1",
             projectIds = emptyList(),
+            members = emptyList(),
             columns = listOf(
                 BoardColumn(
                     id = "c1",
                     title = "Todo",
+                    order = 0,
                     cards = listOf(
                         BoardCard(
                             id = "card1",
                             title = "Task",
                             description = "Desc",
                             priority = "HIGH",
-                            commentCount = 2,
+                            columnId = "c1",
+                            order = 0,
+                            assigneeId = null,
+                            projectIds = emptyList(),
+                            comments = listOf(
+                                CardComment("1", "a", null),
+                                CardComment("2", "b", null),
+                            ),
                             deadlineDueAt = null,
                         ),
                     ),
@@ -60,14 +76,20 @@ class BoardDetailViewModelTest {
                 BoardColumn(
                     id = "c2",
                     title = "Done",
+                    order = 1,
                     cards = emptyList(),
                 ),
             ),
         )
         coEvery { repo.getBoard("b1") } returns Result.success(details)
+        coEvery { teamsRepository.listMembers("t1") } returns Result.success(emptyList())
+        every { sessionRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
+
         val vm = BoardDetailViewModel(
             SavedStateHandle(mapOf("boardId" to "b1")),
             repo,
+            sessionRepository,
+            teamsRepository,
         )
         advanceUntilIdle()
         assertNotNull(vm.uiState.value.board)
@@ -82,10 +104,16 @@ class BoardDetailViewModelTest {
     @Test
     fun loadFailure_setsError() = runTest(dispatcher) {
         val repo = mockk<BoardRepository>()
+        val sessionRepository = mockk<SessionRepository>()
+        val teamsRepository = mockk<TeamsRepository>()
         coEvery { repo.getBoard("b1") } returns Result.failure(IllegalStateException("offline"))
+        every { sessionRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
+
         val vm = BoardDetailViewModel(
             SavedStateHandle(mapOf("boardId" to "b1")),
             repo,
+            sessionRepository,
+            teamsRepository,
         )
         advanceUntilIdle()
         assertEquals("offline", vm.uiState.value.error)

@@ -28,6 +28,7 @@ android {
 
 dependencies {
     implementation(project(":core:network"))
+    implementation(project(":core:session"))
     implementation(project(":feature:teams"))
 
     implementation(libs.androidx.core.ktx)
