@@ -2,6 +2,7 @@ package com.kanban.mobile.feature.boards
 
 import androidx.lifecycle.SavedStateHandle
 import com.kanban.mobile.core.realtime.BoardRealtimeClient
+import com.kanban.mobile.core.realtime.BoardRealtimeEvent
 import com.kanban.mobile.core.session.SessionRepository
 import com.kanban.mobile.core.session.SessionState
 import com.kanban.mobile.feature.teams.TeamsRepository
@@ -11,6 +12,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -89,7 +91,7 @@ class BoardDetailViewModelTest {
         every { sessionRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
         every { sessionRepository.accessTokenFlow } returns flowOf(null)
         val realtime = mockk<BoardRealtimeClient>(relaxed = true)
-        every { realtime.events } returns flowOf()
+        every { realtime.events } returns MutableSharedFlow<BoardRealtimeEvent>(extraBufferCapacity = 8)
         val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
         val vm = BoardDetailViewModel(
@@ -119,7 +121,7 @@ class BoardDetailViewModelTest {
         every { sessionRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
         every { sessionRepository.accessTokenFlow } returns flowOf(null)
         val realtime = mockk<BoardRealtimeClient>(relaxed = true)
-        every { realtime.events } returns flowOf()
+        every { realtime.events } returns MutableSharedFlow<BoardRealtimeEvent>(extraBufferCapacity = 8)
         val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
         val vm = BoardDetailViewModel(

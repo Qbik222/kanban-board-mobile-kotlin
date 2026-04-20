@@ -2,16 +2,19 @@ package com.kanban.mobile.feature.boards
 
 import androidx.lifecycle.SavedStateHandle
 import com.kanban.mobile.core.realtime.BoardRealtimeClient
+import com.kanban.mobile.core.realtime.BoardRealtimeEvent
 import com.kanban.mobile.core.session.SessionRepository
 import com.kanban.mobile.core.session.SessionState
 import com.kanban.mobile.feature.teams.TeamMember
 import com.kanban.mobile.feature.teams.TeamMemberRole
 import com.kanban.mobile.feature.teams.TeamsRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -96,7 +99,7 @@ class BoardDetailViewModelMoveTest {
         )
         every { sessionRepository.accessTokenFlow } returns flowOf("token")
         val realtime = mockk<BoardRealtimeClient>(relaxed = true)
-        every { realtime.events } returns flowOf()
+        every { realtime.events } returns MutableSharedFlow<BoardRealtimeEvent>(extraBufferCapacity = 8)
         val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
         val vm = BoardDetailViewModel(
@@ -114,6 +117,39 @@ class BoardDetailViewModelMoveTest {
         advanceUntilIdle()
 
         assertEquals(before, vm.uiState.value.board)
+    }
+
+    @Test
+    fun moveCardToDropTarget_samePosition_doesNotCallRepository() = runTest(dispatcher) {
+        val repo = mockk<BoardRepository>()
+        val sessionRepository = mockk<SessionRepository>()
+        val teamsRepository = mockk<TeamsRepository>()
+        coEvery { repo.getBoard("b1") } returns Result.success(board())
+        coEvery { teamsRepository.listMembers("t1") } returns Result.success(
+            listOf(TeamMember("owner", null, null, TeamMemberRole.ADMIN)),
+        )
+        every { sessionRepository.sessionState } returns MutableStateFlow(
+            SessionState.Authenticated(userId = "owner", email = "a@a.com"),
+        )
+        every { sessionRepository.accessTokenFlow } returns flowOf("token")
+        val realtime = mockk<BoardRealtimeClient>(relaxed = true)
+        every { realtime.events } returns MutableSharedFlow<BoardRealtimeEvent>(extraBufferCapacity = 8)
+        val json = Json { ignoreUnknownKeys = true; isLenient = true }
+
+        val vm = BoardDetailViewModel(
+            SavedStateHandle(mapOf("boardId" to "b1")),
+            repo,
+            sessionRepository,
+            teamsRepository,
+            realtime,
+            json,
+        )
+        advanceUntilIdle()
+
+        vm.moveCardToDropTarget("k1", "c1", 0)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { repo.moveCard(any(), any(), any()) }
     }
 
     @Test
@@ -136,7 +172,7 @@ class BoardDetailViewModelMoveTest {
         )
         every { sessionRepository.accessTokenFlow } returns flowOf("token")
         val realtime = mockk<BoardRealtimeClient>(relaxed = true)
-        every { realtime.events } returns flowOf()
+        every { realtime.events } returns MutableSharedFlow<BoardRealtimeEvent>(extraBufferCapacity = 8)
         val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
         val vm = BoardDetailViewModel(

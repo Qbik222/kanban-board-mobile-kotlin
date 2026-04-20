@@ -290,35 +290,46 @@ class BoardDetailViewModel @Inject constructor(
         }
     }
 
-    fun moveCardWithinColumn(cardId: String, delta: Int) {
-        if (!can(BoardPermission.MOVE_CARD)) {
-            _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to move cards"))
-            return
-        }
-        val board = _uiState.value.board ?: return
-        val column = board.columns.firstOrNull { col -> col.cards.any { it.id == cardId } } ?: return
-        val oldIndex = column.cards.indexOfFirst { it.id == cardId }
-        val targetIndex = (oldIndex + delta).coerceIn(0, column.cards.lastIndex)
-        if (oldIndex == targetIndex) return
-        val newOrder = sameColumnInsertionIndex(oldIndex, targetIndex)
-        applyMove(cardId, column.id, newOrder)
-    }
-
-    fun moveCardToColumn(cardId: String, targetColumnId: String) {
+    /**
+     * Moves [cardId] into [targetColumnId] at [newOrderAfterRemoval] (zero-based index in the target
+     * column after the card is removed from its source), matching [KanbanBoardReducer.applyCardMove].
+     * No-op if the position is unchanged; does not call the API in that case.
+     */
+    fun moveCardToDropTarget(cardId: String, targetColumnId: String, newOrderAfterRemoval: Int) {
         if (!can(BoardPermission.MOVE_CARD)) {
             _effects.tryEmit(BoardDetailEffect.Snackbar("No permission to move cards"))
             return
         }
         val board = _uiState.value.board ?: return
         val sourceCol = board.columns.firstOrNull { col -> col.cards.any { it.id == cardId } } ?: return
-        val targetCol = board.columns.firstOrNull { it.id == targetColumnId } ?: return
-        if (sourceCol.id == targetColumnId) return
-        val newOrder = if (sourceCol.id == targetColumnId) {
-            sourceCol.cards.indexOfFirst { it.id == cardId }
-        } else {
-            targetCol.cards.count { it.id != cardId }
+        val oldIndex = sourceCol.cards.indexOfFirst { it.id == cardId }
+        if (oldIndex < 0) return
+        if (board.columns.none { it.id == targetColumnId }) return
+
+        if (sourceCol.id == targetColumnId && newOrderAfterRemoval == oldIndex) {
+            return
         }
-        applyMove(cardId, targetColumnId, newOrder.coerceAtLeast(0))
+
+        applyMove(cardId, targetColumnId, newOrderAfterRemoval.coerceAtLeast(0))
+    }
+
+    fun moveCardWithinColumn(cardId: String, delta: Int) {
+        val board = _uiState.value.board ?: return
+        val column = board.columns.firstOrNull { col -> col.cards.any { it.id == cardId } } ?: return
+        val oldIndex = column.cards.indexOfFirst { it.id == cardId }
+        val targetIndex = (oldIndex + delta).coerceIn(0, column.cards.lastIndex)
+        if (oldIndex == targetIndex) return
+        val newOrder = sameColumnInsertionIndex(oldIndex, targetIndex)
+        moveCardToDropTarget(cardId, column.id, newOrder)
+    }
+
+    fun moveCardToColumn(cardId: String, targetColumnId: String) {
+        val board = _uiState.value.board ?: return
+        val sourceCol = board.columns.firstOrNull { col -> col.cards.any { it.id == cardId } } ?: return
+        if (sourceCol.id == targetColumnId) return
+        val targetCol = board.columns.firstOrNull { it.id == targetColumnId } ?: return
+        val newOrder = targetCol.cards.count { it.id != cardId }
+        moveCardToDropTarget(cardId, targetColumnId, newOrder.coerceAtLeast(0))
     }
 
     private fun sameColumnInsertionIndex(oldIndex: Int, targetIndex: Int): Int =

@@ -1,6 +1,9 @@
 package com.kanban.mobile.feature.boards
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,11 +13,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.ExperimentalMaterialApi
@@ -50,8 +56,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -184,6 +200,13 @@ fun BoardDetailScreen(
     }
 }
 
+private data class BoardCardDragSession(
+    val card: BoardCard,
+    val sourceColumnId: String,
+    val sourceIndex: Int,
+    val previewSize: Size,
+)
+
 @Composable
 private fun BoardKanbanContent(
     state: BoardDetailUiState,
@@ -194,7 +217,73 @@ private fun BoardKanbanContent(
     var newColumnTitle by rememberSaveable { mutableStateOf("") }
     var renameTargetId by remember { mutableStateOf<String?>(null) }
     var renameText by rememberSaveable { mutableStateOf("") }
-    var moveCardId by remember { mutableStateOf<String?>(null) }
+
+    var dragSession by remember { mutableStateOf<BoardCardDragSession?>(null) }
+    var fingerRoot by remember { mutableStateOf(Offset.Zero) }
+    var columnBounds by remember { mutableStateOf(mapOf<String, Rect>()) }
+    var cardBounds by remember { mutableStateOf(mapOf<Pair<String, String>, Rect>()) }
+
+    val dropPreview = remember(fingerRoot, board, columnBounds, cardBounds) {
+        resolveDropTarget(fingerRoot, board, columnBounds, cardBounds)
+    }
+
+    val hoverColumnId = dropPreview?.columnId
+    val hoverInsertSlot = dropPreview?.insertBeforeSlot
+
+    val insertLineYRoot: Float? = remember(hoverColumnId, hoverInsertSlot, cardBounds, board, columnBounds) {
+        val colId = hoverColumnId ?: return@remember null
+        val slot = hoverInsertSlot ?: return@remember null
+        val column = board.columns.firstOrNull { it.id == colId } ?: return@remember null
+        val rects = column.cards.mapNotNull { c -> cardBounds[colId to c.id] }.sortedBy { it.top }
+        val colRect = columnBounds[colId]
+        if (rects.isEmpty()) {
+            return@remember colRect?.let { it.top + it.height * 0.45f }
+        }
+        when {
+            slot <= 0 -> rects.first().top
+            slot >= rects.size -> rects.last().bottom
+            else -> (rects[slot - 1].bottom + rects[slot].top) / 2f
+        }
+    }
+
+    val insertLineLocalYInHoveredColumn: Float? = remember(hoverColumnId, insertLineYRoot, columnBounds) {
+        val cid = hoverColumnId ?: return@remember null
+        val lineY = insertLineYRoot ?: return@remember null
+        val top = columnBounds[cid]?.top ?: return@remember null
+        lineY - top
+    }
+
+    fun registerColumnBounds(columnId: String, rect: Rect) {
+        columnBounds = columnBounds + (columnId to rect)
+    }
+
+    fun registerCardBounds(columnId: String, cardId: String, rect: Rect) {
+        cardBounds = cardBounds + ((columnId to cardId) to rect)
+    }
+
+    fun startDrag(session: BoardCardDragSession, finger: Offset) {
+        dragSession = session
+        fingerRoot = finger
+    }
+
+    fun moveFinger(offset: Offset) {
+        fingerRoot = offset
+    }
+
+    fun endDrag(fingerInRoot: Offset) {
+        val session = dragSession ?: return
+        dragSession = null
+        val drop = resolveDropTarget(fingerInRoot, board, columnBounds, cardBounds) ?: return
+        val targetColumn = board.columns.firstOrNull { it.id == drop.columnId } ?: return
+        val newOrder = newOrderAfterRemoval(
+            sourceColumnId = session.sourceColumnId,
+            sourceIndex = session.sourceIndex,
+            targetColumnId = drop.columnId,
+            insertBeforeSlot = drop.insertBeforeSlot,
+            targetCardsIncludingDragged = targetColumn.cards,
+        )
+        viewModel.moveCardToDropTarget(session.card.id, drop.columnId, newOrder)
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -247,26 +336,73 @@ private fun BoardKanbanContent(
             }
         }
 
-        LazyRow(
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        var kanbanBoxOriginInRoot by remember { mutableStateOf(Offset.Zero) }
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .onGloballyPositioned { coords ->
+                    kanbanBoxOriginInRoot = coords.boundsInRoot().topLeft
+                },
         ) {
-            items(board.columns.sortedBy { it.order }, key = { it.id }) { column ->
-                KanbanColumnCard(
-                    column = column,
-                    board = board,
-                    viewModel = viewModel,
-                    onRenameRequest = {
-                        renameTargetId = column.id
-                        renameText = column.title
-                    },
-                    onPickMoveTarget = { cardId ->
-                        moveCardId = cardId
-                    },
-                )
+            LazyRow(
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                userScrollEnabled = dragSession == null,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                items(board.columns.sortedBy { it.order }, key = { it.id }) { column ->
+                    KanbanColumnCard(
+                        column = column,
+                        board = board,
+                        viewModel = viewModel,
+                        isDragging = dragSession != null,
+                        draggedCardId = dragSession?.card?.id,
+                        hoverColumnId = hoverColumnId,
+                        insertLineLocalY = if (hoverColumnId == column.id) insertLineLocalYInHoveredColumn else null,
+                        onRenameRequest = {
+                            renameTargetId = column.id
+                            renameText = column.title
+                        },
+                        onRegisterColumnBounds = { id, rect -> registerColumnBounds(id, rect) },
+                        onRegisterCardBounds = { colId, cId, rect -> registerCardBounds(colId, cId, rect) },
+                        onStartDrag = { card, colId, idx, finger, size ->
+                            startDrag(
+                                BoardCardDragSession(card, colId, idx, size),
+                                finger,
+                            )
+                        },
+                        onDragMove = { moveFinger(it) },
+                        onDragEnd = { finger -> endDrag(finger) },
+                    )
+                }
+            }
+
+            dragSession?.let { session ->
+                val x = (fingerRoot.x - kanbanBoxOriginInRoot.x - session.previewSize.width * 0.35f).roundToInt()
+                val y = (fingerRoot.y - kanbanBoxOriginInRoot.y - session.previewSize.height * 0.35f).roundToInt()
+                Card(
+                    modifier = Modifier
+                        .offset { IntOffset(x, y) }
+                        .width(240.dp)
+                        .graphicsLayer { alpha = 0.92f },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = session.card.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
     }
@@ -300,34 +436,6 @@ private fun BoardKanbanContent(
             },
         )
     }
-
-    val moveId = moveCardId
-    if (moveId != null) {
-        AlertDialog(
-            onDismissRequest = { moveCardId = null },
-            confirmButton = {
-                TextButton(onClick = { moveCardId = null }) {
-                    Text("Close")
-                }
-            },
-            title = { Text("Move to column") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    board.columns.sortedBy { it.order }.forEach { col ->
-                        TextButton(
-                            onClick = {
-                                viewModel.moveCardToColumn(moveId, col.id)
-                                moveCardId = null
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(col.title, modifier = Modifier.fillMaxWidth())
-                        }
-                    }
-                }
-            },
-        )
-    }
 }
 
 @Composable
@@ -335,104 +443,143 @@ private fun KanbanColumnCard(
     column: BoardColumn,
     board: BoardDetails,
     viewModel: BoardDetailViewModel,
+    isDragging: Boolean,
+    draggedCardId: String?,
+    hoverColumnId: String?,
+    insertLineLocalY: Float?,
     onRenameRequest: () -> Unit,
-    onPickMoveTarget: (String) -> Unit,
+    onRegisterColumnBounds: (String, Rect) -> Unit,
+    onRegisterCardBounds: (String, String, Rect) -> Unit,
+    onStartDrag: (BoardCard, String, Int, Offset, Size) -> Unit,
+    onDragMove: (Offset) -> Unit,
+    onDragEnd: (Offset) -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val sortedCols = board.columns.sortedBy { it.order }
+    val showHover = isDragging && hoverColumnId == column.id
 
     Card(
         modifier = Modifier
             .width(280.dp)
-            .height(460.dp),
+            .height(460.dp)
+            .onGloballyPositioned { coords ->
+                onRegisterColumnBounds(column.id, coords.boundsInRoot())
+            }
+            .then(
+                if (showHover) {
+                    Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                } else {
+                    Modifier
+                },
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.padding(12.dp),
             ) {
-                Text(
-                    text = column.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (viewModel.can(BoardPermission.REORDER_COLUMNS)) {
-                    Row {
-                        IconButton(
-                            enabled = sortedCols.indexOfFirst { it.id == column.id } > 0,
-                            onClick = { viewModel.moveColumn(column.id, -1) },
-                            modifier = Modifier.padding(0.dp),
-                        ) {
-                            Text("◀")
-                        }
-                        IconButton(
-                            enabled = sortedCols.indexOfFirst { it.id == column.id } < sortedCols.lastIndex,
-                            onClick = { viewModel.moveColumn(column.id, +1) },
-                            modifier = Modifier.padding(0.dp),
-                        ) {
-                            Text("▶")
-                        }
-                    }
-                }
-                Box {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Text("⋯")
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        if (viewModel.can(BoardPermission.UPDATE_COLUMN)) {
-                            DropdownMenuItem(
-                                text = { Text("Rename") },
-                                onClick = {
-                                    menuOpen = false
-                                    onRenameRequest()
-                                },
-                            )
-                        }
-                        if (viewModel.can(BoardPermission.DELETE_COLUMN)) {
-                            DropdownMenuItem(
-                                text = { Text("Delete") },
-                                onClick = {
-                                    menuOpen = false
-                                    viewModel.deleteColumn(column.id)
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (viewModel.can(BoardPermission.CREATE_CARD)) {
-                OutlinedButton(
-                    onClick = { viewModel.createCard(column.id) },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("+ Card")
+                    Text(
+                        text = column.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (viewModel.can(BoardPermission.REORDER_COLUMNS)) {
+                        Row {
+                            IconButton(
+                                enabled = sortedCols.indexOfFirst { it.id == column.id } > 0,
+                                onClick = { viewModel.moveColumn(column.id, -1) },
+                                modifier = Modifier.padding(0.dp),
+                            ) {
+                                Text("◀")
+                            }
+                            IconButton(
+                                enabled = sortedCols.indexOfFirst { it.id == column.id } < sortedCols.lastIndex,
+                                onClick = { viewModel.moveColumn(column.id, +1) },
+                                modifier = Modifier.padding(0.dp),
+                            ) {
+                                Text("▶")
+                            }
+                        }
+                    }
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Text("⋯")
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            if (viewModel.can(BoardPermission.UPDATE_COLUMN)) {
+                                DropdownMenuItem(
+                                    text = { Text("Rename") },
+                                    onClick = {
+                                        menuOpen = false
+                                        onRenameRequest()
+                                    },
+                                )
+                            }
+                            if (viewModel.can(BoardPermission.DELETE_COLUMN)) {
+                                DropdownMenuItem(
+                                    text = { Text("Delete") },
+                                    onClick = {
+                                        menuOpen = false
+                                        viewModel.deleteColumn(column.id)
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
+
                 Spacer(modifier = Modifier.height(8.dp))
+
+                if (viewModel.can(BoardPermission.CREATE_CARD)) {
+                    OutlinedButton(
+                        onClick = { viewModel.createCard(column.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("+ Card")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    itemsIndexed(column.cards, key = { _, c -> c.id }) { indexInColumn, card ->
+                        KanbanCardRow(
+                            card = card,
+                            columnId = column.id,
+                            sourceIndex = indexInColumn,
+                            viewModel = viewModel,
+                            isDraggedCard = draggedCardId == card.id,
+                            onOpen = { viewModel.selectCard(card.id) },
+                            onRegisterCardBounds = { rect ->
+                                onRegisterCardBounds(column.id, card.id, rect)
+                            },
+                            onStartDrag = onStartDrag,
+                            onDragMove = onDragMove,
+                            onDragEnd = onDragEnd,
+                        )
+                    }
+                }
             }
 
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                items(column.cards, key = { it.id }) { card ->
-                    KanbanCardRow(
-                        card = card,
-                        viewModel = viewModel,
-                        onOpen = { viewModel.selectCard(card.id) },
-                        onMoveOtherColumn = { onPickMoveTarget(card.id) },
-                    )
-                }
+            insertLineLocalY?.let { ly ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset { IntOffset(0, ly.roundToInt()) }
+                        .height(3.dp)
+                        .background(MaterialTheme.colorScheme.primary),
+                )
             }
         }
     }
@@ -441,57 +588,70 @@ private fun KanbanColumnCard(
 @Composable
 private fun KanbanCardRow(
     card: BoardCard,
+    columnId: String,
+    sourceIndex: Int,
     viewModel: BoardDetailViewModel,
+    isDraggedCard: Boolean,
     onOpen: () -> Unit,
-    onMoveOtherColumn: () -> Unit,
+    onRegisterCardBounds: (Rect) -> Unit,
+    onStartDrag: (BoardCard, String, Int, Offset, Size) -> Unit,
+    onDragMove: (Offset) -> Unit,
+    onDragEnd: (Offset) -> Unit,
 ) {
+    var layoutCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var lastFingerInRoot by remember { mutableStateOf(Offset.Zero) }
+    val canMove = viewModel.can(BoardPermission.MOVE_CARD)
+
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
         modifier = Modifier
             .fillMaxWidth()
+            .onGloballyPositioned { coords ->
+                layoutCoords = coords
+                onRegisterCardBounds(coords.boundsInRoot())
+            }
+            .graphicsLayer { alpha = if (isDraggedCard) 0.35f else 1f }
+            .then(
+                if (canMove) {
+                    Modifier.pointerInput(card.id, columnId) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { offset ->
+                                val lc = layoutCoords ?: return@detectDragGesturesAfterLongPress
+                                val root = lc.toRootOffset(offset)
+                                lastFingerInRoot = root
+                                val sz = Size(lc.size.width.toFloat(), lc.size.height.toFloat())
+                                onStartDrag(card, columnId, sourceIndex, root, sz)
+                            },
+                            onDrag = { change, _ ->
+                                val lc = layoutCoords ?: return@detectDragGesturesAfterLongPress
+                                val root = lc.toRootOffset(change.position)
+                                lastFingerInRoot = root
+                                onDragMove(root)
+                                change.consume()
+                            },
+                            onDragEnd = { onDragEnd(lastFingerInRoot) },
+                            onDragCancel = { onDragEnd(lastFingerInRoot) },
+                        )
+                    }
+                } else {
+                    Modifier
+                },
+            )
             .clickable(onClick = onOpen),
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Row(
+            Text(
+                text = card.title,
+                style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = card.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (viewModel.can(BoardPermission.MOVE_CARD)) {
-                    Row {
-                        IconButton(
-                            onClick = { viewModel.moveCardWithinColumn(card.id, -1) },
-                            modifier = Modifier.padding(0.dp),
-                        ) {
-                            Text("↑")
-                        }
-                        IconButton(
-                            onClick = { viewModel.moveCardWithinColumn(card.id, +1) },
-                            modifier = Modifier.padding(0.dp),
-                        ) {
-                            Text("↓")
-                        }
-                        IconButton(
-                            onClick = onMoveOtherColumn,
-                            modifier = Modifier.padding(0.dp),
-                        ) {
-                            Text("⇄")
-                        }
-                    }
-                }
-            }
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
             card.priority?.let { p ->
                 Text(
                     text = "Priority: $p",
@@ -669,3 +829,6 @@ private fun CardDetailSheet(
         Spacer(modifier = Modifier.height(24.dp))
     }
 }
+
+private fun LayoutCoordinates.toRootOffset(localOffset: Offset): Offset =
+    boundsInRoot().topLeft + localOffset
