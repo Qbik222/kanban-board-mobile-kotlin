@@ -10,6 +10,7 @@ import com.kanban.mobile.feature.boards.permissions.BoardAdminPermission
 import com.kanban.mobile.feature.boards.permissions.resolveEffectiveBoardRole
 import com.kanban.mobile.feature.boards.permissions.roleHasAdminPermission
 import com.kanban.mobile.feature.teams.InviteCandidate
+import com.kanban.mobile.feature.teams.TeamMember
 import com.kanban.mobile.feature.teams.filterByInvitePrefix
 import com.kanban.mobile.feature.teams.TeamMemberRole
 import com.kanban.mobile.feature.teams.TeamsRepository
@@ -21,10 +22,12 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -38,6 +41,8 @@ data class BoardSettingsUiState(
     val projectIds: List<String> = emptyList(),
     val newProjectIdInput: String = "",
     val teamId: String = "",
+    /** Full team roster from [TeamsRepository.listMembers]; invite search uses this list only. */
+    val teamMembers: List<TeamMember> = emptyList(),
     val inviteSearchQuery: String = "",
     val inviteCandidates: List<InviteCandidate> = emptyList(),
     val members: List<BoardMember> = emptyList(),
@@ -56,6 +61,13 @@ sealed interface BoardSettingsUiEffect {
     data class Snackbar(val message: String) : BoardSettingsUiEffect
     data object NavigateToBoardsAfterDelete : BoardSettingsUiEffect
 }
+
+private data class InviteSearchInputs(
+    val query: String,
+    val teamId: String,
+    val teamMembers: List<TeamMember>,
+    val boardMembers: List<BoardMember>,
+)
 
 @OptIn(kotlinx.coroutines.FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -78,17 +90,27 @@ class BoardSettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            inviteSearchInput
-                .debounce(400L)
-                .distinctUntilChanged()
-                .flatMapLatest { q ->
+            combine(
+                inviteSearchInput
+                    .debounce(400L)
+                    .distinctUntilChanged(),
+                _uiState.map { it.teamId }.distinctUntilChanged(),
+                _uiState.map { it.teamMembers }.distinctUntilChanged(),
+                _uiState.map { it.members }.distinctUntilChanged(),
+            ) { query, teamId, teamMembers, boardMembers ->
+                InviteSearchInputs(query, teamId, teamMembers, boardMembers)
+            }
+                .flatMapLatest { inp ->
                     flow {
-                        val teamId = _uiState.value.teamId
-                        if (teamId.isBlank() || q.trim().isEmpty()) {
+                        val q = inp.query
+                        if (inp.teamId.isBlank() || q.trim().isEmpty()) {
                             emit(emptyList())
                         } else {
-                            val r = teamsRepository.inviteSearch(teamId, q, limit = 20)
-                            emit(r.getOrElse { emptyList() }.filterByInvitePrefix(q))
+                            val onBoard = inp.boardMembers.map { it.userId }.toSet()
+                            val candidates = inp.teamMembers
+                                .filter { it.userId !in onBoard }
+                                .map { InviteCandidate(it.userId, it.email, it.name) }
+                            emit(candidates.filterByInvitePrefix(q))
                         }
                     }
                 }
@@ -106,9 +128,10 @@ class BoardSettingsViewModel @Inject constructor(
             val userId = (session as? SessionState.Authenticated)?.userId
             boardRepository.getBoard(boardId).fold(
                 onSuccess = { board ->
+                    val teamMembersList =
+                        teamsRepository.listMembers(board.teamId).getOrNull().orEmpty()
                     val teamAdmin = userId?.let { uid ->
-                        teamsRepository.listMembers(board.teamId).getOrNull()
-                            ?.any { it.userId == uid && it.role == TeamMemberRole.ADMIN }
+                        teamMembersList.any { it.userId == uid && it.role == TeamMemberRole.ADMIN }
                     } == true
                     val role = resolveEffectiveBoardRole(board, userId, teamAdmin)
                     _uiState.update {
@@ -119,6 +142,7 @@ class BoardSettingsViewModel @Inject constructor(
                             titleDraft = board.title,
                             projectIds = board.projectIds.toList(),
                             teamId = board.teamId,
+                            teamMembers = teamMembersList,
                             members = board.members,
                             ownerId = board.ownerId,
                             effectiveRole = role,

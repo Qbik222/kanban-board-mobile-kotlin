@@ -16,6 +16,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -83,6 +84,40 @@ class BoardSettingsViewModelTest {
         assertEquals(1, st.members.size)
         assertEquals(BoardRole.OWNER, st.effectiveRole)
         assertFalse(st.loading)
+        assertEquals(0, st.teamMembers.size)
+    }
+
+    @Test
+    fun inviteCandidates_filtersTeamMembersNotOnBoard_noInviteSearchApi() = runTest(dispatcher) {
+        val repo = mockk<BoardRepository>()
+        coEvery { repo.getBoard("b1") } returns Result.success(sampleBoard())
+        val session = mockk<SessionRepository>()
+        every { session.sessionState } returns MutableStateFlow(
+            SessionState.Authenticated(userId = "owner-1", email = "o@test"),
+        )
+        every { session.accessTokenFlow } returns flowOf(null)
+        val teams = mockk<TeamsRepository>()
+        coEvery { teams.listMembers("t1") } returns Result.success(
+            listOf(
+                TeamMember("u3", "abigail@test.com", "Abi", TeamMemberRole.MEMBER),
+                TeamMember("u2", "e2@test", null, TeamMemberRole.MEMBER),
+            ),
+        )
+
+        val vm = BoardSettingsViewModel(
+            SavedStateHandle(mapOf("boardId" to "b1")),
+            repo,
+            session,
+            teams,
+        )
+        vm.onInviteSearchQueryChange("ab")
+        advanceTimeBy(400L)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { teams.inviteSearch(any(), any(), any()) }
+        coVerify(atLeast = 1) { teams.listMembers("t1") }
+        assertEquals(1, vm.uiState.value.inviteCandidates.size)
+        assertEquals("u3", vm.uiState.value.inviteCandidates.first().userId)
     }
 
     @Test
